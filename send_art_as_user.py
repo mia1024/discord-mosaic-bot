@@ -1,5 +1,6 @@
 from PIL import Image
 from art import downsample, gen_emoji_preview, gen_emoji_sequence
+from cv import find_scale
 import requests
 import random
 import time
@@ -9,7 +10,9 @@ API_ENDPOINT='https://discord.com/api/v8'
 name=input('Image filename? ')
 
 img=Image.open(name)
-img=downsample(img.crop(img.getbbox()),int(input('Downsample scale? ')))
+scale=find_scale(img)
+print(f'Downsampling at {scale}x')
+img=downsample(img.crop(img.getbbox()),find_scale(img))
 gen_emoji_preview(img).show()
 channel=input('Channel id? ')
 token=input('Auth token? ')
