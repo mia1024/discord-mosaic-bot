@@ -61,8 +61,5 @@ def gen_emoji_preview(img:Image.Image):
                 preview.putpixel((x,y),find_closest_color(r,g,b))
     return preview
 
-im=Image.open('test.png')
-im=downsample(im,9)
-gen_emoji_preview(im).resize((im.width*10,im.height*10),Image.NEAREST).show()
 
 
