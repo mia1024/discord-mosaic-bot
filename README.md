@@ -9,7 +9,7 @@ Well, this is why the mosaic bot is here! If the image you wanted to send happen
 And, you can make it **even larger**! Like this:
 ![large fireball](screenshots/fireball_large.png)
 
-although...your friends might need a 4k monitor to render it correctly. You've been warned.
+although...your friends might need some 4k monitors to render it correctly. You've been warned.
 
 To give a more direct comparison of the size differences: 
 ![all fireballs](screenshots/all_fireballs.png)
