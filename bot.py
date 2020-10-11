@@ -10,6 +10,7 @@ from typing import List
 from emojis import get_emoji_by_rgb
 import aiohttp
 import re
+from dataclasses import dataclass
 
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
 
@@ -58,20 +59,56 @@ async def delete_messages(cid: int, msgs: List[int]):
         # if MANAGE_MESSAGE permission isn't granted then whatever
 
 
-def split_minimal(seq: str):
-    
+def split_minimal(seq: str, strip_end=True):
     res = []
-    msg=''
+    msg = ''
     for line in seq.splitlines():
-        line=re.sub(f'({get_emoji_by_rgb(255,255,255)}|{get_emoji_by_rgb(-1,-1,-1)})+\u200b?$','\u200b',line)
-        if len(msg)+len(line)<2000:
-            msg+=line+'\n'
+        if strip_end:
+            line = re.sub(f'({get_emoji_by_rgb(255, 255, 255)}|{get_emoji_by_rgb(-1, -1, -1)})+\u200b?$', '\u200b',
+                          line)
+        if len(msg) + len(line) < 2000:
+            msg += line + '\n'
         else:
             res.append(msg)
-            msg=line+'\n'
+            msg = line + '\n'
     if msg:
         res.append(msg)
     return res
+
+
+@dataclass
+class ShowOptions:
+    name: str = None
+    large: bool = False
+    no_space: bool = False
+    strip_end: bool = True
+    light_mode: bool = False
+
+
+def parse_opt(s: str):
+    l = s.split()
+    i = 0
+    opts = ShowOptions()
+    while i < len(l):
+        if l[i] == 'large':
+            opts.large = True
+        elif l[i] == 'light':
+            opts.light_mode = True
+        elif l[i] == 'nospace':
+            opts.no_space = True
+        elif l[i] == 'no':
+            if i < len(l) - 1 and l[i + 1] == 'space':
+                opts.no_space = True
+                i += 1
+        elif l[i] == 'with':
+            if i < len(l) - 1 and l[i + 1] == 'padding':
+                opts.strip_end = False
+                i += 1
+        else:
+            if opts.name is None:
+                opts.name=l[i]
+        i += 1
+    return opts
 
 
 @bot.command()
@@ -84,55 +121,51 @@ async def show(ctx: commands.Context, *, raw_args: str = ''):
             return
         args = raw_args.split()
         
-        if args[0] == 'help':
+        if args and args[0] == 'help':
             msg = await ctx.send('Please refer to https://mosaic.by.jerie.wang/reference for help')
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
-        large = False
-        no_space = False
-        light_mode = False
-        try:
-            if args[0] == 'large':
-                large = True
-                name = args[1]
-            else:
-                name = args[0]
-            if 'nospace' in args or 'no space' in raw_args:
-                no_space = True
-            if 'light' in args:
-                light_mode = True
-        except IndexError:
+        opts=parse_opt(raw_args)
+        if not opts.name:
+            m='You want me to show a '
+            if opts.large:
+                m+='large '
+            if opts.no_space:
+                m+='no space '
+                if opts.strip_end and not opts.large:
+                    m+='with padding '
+            if opts.light_mode:
+                m+='light mode '
+            m+='image of...what?'
+            msg = await ctx.send(m)
+            sent_msgs[ctx.message.id] = [msg.id]
             return
-        
+            
         await ctx.trigger_typing()
-        if not validate_filename(name):
-            msg = await ctx.send(f"Sorry, I don't know what an image of `{name}` looks like. "
+        if not validate_filename(opts.name):
+            msg = await ctx.send(f"Sorry, I don't know what an image of `{opts.name}` looks like. "
                                  f"The names of all the images known to me contain only "
                                  f"alphanumeric characters, hyphens, and underscores")
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
-        if not os.path.exists(f'images/{name}.png'):
-            msg = await ctx.send(f"Sorry, I don't know what an image of `{name}` looks like")
+        if not os.path.exists(f'images/{opts.name}.png'):
+            msg = await ctx.send(f"Sorry, I don't know what an image of `{opts.name}` looks like")
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
-        img = Image.open(f'images/{name}.png')
-        if large and img.width > 27:
+        img = Image.open(f'images/{opts.name}.png')
+        if opts.large and img.width > 27:
             # discord displays all lines above 27 emojis as inline
             msg = await ctx.send(
-                f"Sorry, I can't send a large image of `{name}` because it's {img.width - 27} pixels too wide")
+                    f"Sorry, I can't send a large image of `{opts.name}` because it's {img.width - 27} pixels too wide")
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
-        emojis = gen_emoji_sequence(img, large, no_space, light_mode)
-        if no_space and img.width * img.height < 70 and not large:
-            await ctx.send(emojis.strip())  # that should be exactly 2000 characters for a 69x1 image
-            return
-        
-        if no_space and not large:
-            messages = split_minimal(emojis)
+        emojis = gen_emoji_sequence(img, opts.large, opts.no_space, opts.light_mode)
+        if opts.no_space and not opts.large:
+            messages = split_minimal(emojis,opts.strip_end)
         else:
             messages = emojis.splitlines()
         
@@ -166,6 +199,7 @@ async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
 async def on_ready():
     print('Logged in as ' + bot.user.name + '#' + bot.user.discriminator)
     await bot.change_presence(activity=discord.Activity(name='|show help', type=discord.ActivityType.playing))
+
 
 if __name__ == '__main__':
     bot.run(MOSAIC_BOT_TOKEN)
