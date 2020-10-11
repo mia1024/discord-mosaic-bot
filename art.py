@@ -1,65 +1,62 @@
-from emojis import get_emoji_by_rgb, find_closest_color
+from emojis import get_emoji_by_rgb
 from PIL import Image
 import numpy as np
-from utils import rgb_to_int,int_to_rgb
+from color import Color
+from cv import find_scale
 
-def downsample(img: Image.Image, scale: int = None):
+
+def downsample(img: Image.Image, scale: int = None) -> Image.Image:
     if not scale:
-        for n in range(img.size[0] // 20):
-            scale = img.size[0] // 20
-            if (img.size[0] / scale).is_integer() and img.size[0] / scale <= 20:
-                scale = 20 - n
-        else:
-            scale = 20
-    
+        scale = find_scale(img)
     return img.resize((img.size[0] // scale, img.size[1] // scale), Image.NEAREST)
 
 
-bg = get_emoji_by_rgb(*int_to_rgb(0x37393f))
+def crop(img: Image.Image) -> Image.Image:
+    return img.crop(img.getbbox())
 
-def gen_emoji_sequence(img:Image.Image):
-    res=''
-    if img.mode=='RGBA':
-        arr = np.array(img)
-        for row in arr:
-            for col in row:
-                r, g, b, a = col
-                if a == 0:
-                    emoji = bg
+
+# single line emojis will be rendered small >= 28
+
+def gen_emoji_sequence(img: Image.Image, large=False, no_space=False, light_mode=False):
+    # all images passed in should be preprocessed images
+    # ie. RGBA, downsampled
+    res = ''
+    arr = np.array(img)
+    for row in arr:
+        for col in row:
+            r, g, b, a = col
+            if a == 0:
+                if light_mode:
+                    emoji = get_emoji_by_rgb(255, 255, 255)
                 else:
-                    emoji = get_emoji_by_rgb(r,g,b)
-                res+=emoji
-            res+='\n'
-    else:
-        if img.mode!='RGB':
-            arr=np.array(img.convert('RGB'))
-        else:
-            arr=np.array(img)
-        for row in arr:
-            for col in row:
-                emoji = get_emoji_by_rgb(*col)
-                res+=emoji
-            res+='\n'
+                    emoji = get_emoji_by_rgb(-1, -1, -1)
+            else:
+                emoji = get_emoji_by_rgb(r, g, b)
+            res += emoji
+            if not no_space:
+                res += ' '
+        if not large:
+            res += '\u200b'
+        res += '\n'
     return res
 
-def gen_emoji_preview(img:Image.Image):
-    preview=Image.new(img.mode,img.size)
-    if img.mode=='RGBA':
-        arr = np.array(img)
-        for y,row in enumerate(arr):
-            for x,col in enumerate(row):
+
+def gen_emoji_preview(img: Image.Image):
+    preview = Image.new(img.mode, img.size)
+    if img.mode not in ('RGB', 'RGBA'):
+        img = img.convert('RGBA')
+    arr = np.array(img)
+    if img.mode == 'RGBA':
+        for y, row in enumerate(arr):
+            for x, col in enumerate(row):
                 r, g, b, a = col
-                preview.putpixel((x,y),(*find_closest_color(r,g,b),255 if a else 0))
+                preview.putpixel((x, y), (*Color(r, g, b).approx_12bit(), 255 if a else 0))
     else:
-        if img.mode!='RGB':
-            arr=np.array(img.convert('RGB'))
-        else:
-            arr=np.array(img)
-        for y,row in enumerate(arr):
-            for x,col in enumerate(row):
+        for y, row in enumerate(arr):
+            for x, col in enumerate(row):
                 r, g, b = col
-                preview.putpixel((x,y),find_closest_color(r,g,b))
-    return preview
+                preview.putpixel((x, y), tuple(Color(r, g, b).approx_12bit()))
+    return preview.resize((img.width * 40, img.height * 40), Image.NEAREST)
 
 
-
+__all__ = ['gen_emoji_preview', 'gen_emoji_sequence', 'downsample', 'crop']

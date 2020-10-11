@@ -5,6 +5,7 @@ from collections import Counter
 from math import log2
 from typing import List
 
+
 class ScaleCandidate:
     def __init__(self, scale: int, score=0):
         self.scale = scale
@@ -25,23 +26,31 @@ class ScaleCandidate:
     def __truediv__(self, other):
         return self.scale / other.scale
 
+
 class DebugData:
     def __init__(self):
-        self.candidates:List[ScaleCandidate]=None
-        self.labeled:np.ndarray=None
+        self.candidates: List[ScaleCandidate] = None
+        self.labeled: np.ndarray = None
 
-def find_scale(PIL_image: Image.Image,debug:DebugData=None):
+
+def find_scale(PIL_image: Image.Image, debug: DebugData = None):
     cropped = PIL_image.crop(PIL_image.getbbox())
-    if cropped.width<=21:
+    if cropped.mode not in ('RGB', 'RGBA'):
+        cropped = cropped.convert('RGBA')
+    if cropped.width <= 21:
         return 1
     arr = np.array(cropped)
-    im = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY if PIL_image.mode == 'RGB' else cv2.COLOR_RGBA2GRAY)
+    if cropped.mode == 'RGBA':
+        im = cv2.cvtColor(arr, cv2.COLOR_RGBA2GRAY)
+    else:
+        im = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+    
     edges = cv2.Canny(im, 50, 150)
     cnt, hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     if debug is not None:
-        debug.labeled=cv2.drawContours(
-                cv2.cvtColor(arr,cv2.COLOR_RGB2BGR if PIL_image.mode == 'RGB' else cv2.COLOR_RGBA2BGRA),
-                cnt, -1, (255,0,0,255), 4
+        debug.labeled = cv2.drawContours(
+                cv2.cvtColor(arr, cv2.COLOR_RGB2BGR if PIL_image.mode == 'RGB' else cv2.COLOR_RGBA2BGRA),
+                cnt, -1, (255, 0, 0, 255), 4
         )
     l = []
     
@@ -50,8 +59,8 @@ def find_scale(PIL_image: Image.Image,debug:DebugData=None):
             continue
         x, y, w, h = cv2.boundingRect(c)
         if debug is not None:
-            cv2.rectangle(debug.labeled,(x,y),(x+w,y+h),(255,0,255,255),2)
-            
+            cv2.rectangle(debug.labeled, (x, y), (x + w, y + h), (255, 0, 255, 255), 2)
+        
         l.extend((w, h))
     
     candidates = []
@@ -60,32 +69,35 @@ def find_scale(PIL_image: Image.Image,debug:DebugData=None):
             # noise
             continue
         
-        candidates.append(ScaleCandidate(n - 1,occ))  # the bbox is always 1 or 2 pixels larger
-        candidates.append(ScaleCandidate(n - 2,occ))
+        candidates.append(ScaleCandidate(n - 1, occ))  # the bbox is always 1 or 2 pixels larger
+        candidates.append(ScaleCandidate(n - 2, occ))
     
-    candidates.sort(key=lambda c:c.scale)
+    candidates.sort(key=lambda c: c.scale)
     while True:
-        for i in range(len(candidates)-1):
-            if candidates[i].scale==candidates[i+1].scale:
-                candidates[i].score+=candidates[i+1].score
-                del candidates[i+1]
+        for i in range(len(candidates) - 1):
+            if candidates[i].scale == candidates[i + 1].scale:
+                candidates[i].score += candidates[i + 1].score
+                del candidates[i + 1]
                 break
         else:
             break
     
     for c in candidates:
-        if log2(c.scale).is_integer() or (c.scale/5).is_integer():
+        if log2(c.scale).is_integer() or (c.scale / 5).is_integer():
             # artists tend to choose some "normal" looking numbers
             # used as tie breakers for some ridiculously compressed images
-            c.score+=1
+            c.score += 1
         c.score += (cropped.width / c.scale).is_integer()
         for d in candidates:
             c.score += (d / c).is_integer()
-
-    candidates.sort(key=lambda c:c.score,reverse=True)
+    
+    candidates.sort(key=lambda c: c.score, reverse=True)
     
     if debug is not None:
-        debug.candidates=candidates
+        debug.candidates = candidates
     if not candidates:
-        return cropped.width//20+1
+        return cropped.width // 20 + 1
     return candidates[0].scale
+
+
+__all__ = ['find_scale', 'DebugData']

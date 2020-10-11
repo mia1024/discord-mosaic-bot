@@ -31,4 +31,4 @@ for r in range(16):
             RGB_4096.append((r << 20) + (r << 16) + (g << 12) + (g << 8) + (b << 4) + b)
 RGB_4096.sort()
 
-
+__all__ = ['RGB_4096', 'VGA_13H']
