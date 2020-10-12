@@ -6,7 +6,7 @@ from PIL import Image
 import os
 from art import gen_emoji_sequence
 from credentials import MOSAIC_BOT_TOKEN
-from typing import List
+from typing import List, Union
 from emojis import get_emoji_by_rgb
 import aiohttp
 import re
@@ -111,36 +111,40 @@ def parse_opt(s: str):
     return opts
 
 
+
 @bot.command()
-async def show(ctx: commands.Context, *, raw_args: str = ''):
+async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[ShowOptions,str] = ''):
     async with lock_channel(ctx.channel.id):
         if ctx.message.id in interrupted:
             return
-        
-        if not raw_args:
-            return
-        args = raw_args.split()
-        
-        if args and args[0] == 'help':
-            msg = await ctx.send('Please refer to https://mosaic.by.jerie.wang/reference for help')
-            sent_msgs[ctx.message.id] = [msg.id]
-            return
-        
-        opts=parse_opt(raw_args)
-        if not opts.name:
-            m='You want me to show a '
-            if opts.large:
-                m+='large '
-            if opts.no_space:
-                m+='no space '
-                if opts.strip_end and not opts.large:
-                    m+='with padding '
-            if opts.light_mode:
-                m+='light mode '
-            m+='image of...what?'
-            msg = await ctx.send(m)
-            sent_msgs[ctx.message.id] = [msg.id]
-            return
+        if isinstance(raw_or_parsed_args,str):
+            raw_args=raw_or_parsed_args
+            if not raw_args:
+                return
+            args = raw_args.split()
+            
+            if args and args[0] == 'help':
+                msg = await ctx.send('Please refer to https://mosaic.by.jerie.wang/reference for help')
+                sent_msgs[ctx.message.id] = [msg.id]
+                return
+            
+            opts=parse_opt(raw_args)
+            if not opts.name:
+                m='You want me to show a '
+                if opts.large:
+                    m+='large '
+                if opts.no_space:
+                    m+='no space '
+                    if opts.strip_end and not opts.large:
+                        m+='with padding '
+                if opts.light_mode:
+                    m+='light mode '
+                m+='image of...what?'
+                msg = await ctx.send(m)
+                sent_msgs[ctx.message.id] = [msg.id]
+                return
+        else:
+            opts=raw_or_parsed_args
             
         await ctx.trigger_typing()
         if not validate_filename(opts.name):
@@ -186,6 +190,16 @@ async def show(ctx: commands.Context, *, raw_args: str = ''):
         else:
             sent_msgs[ctx.message.id] = sent
 
+@bot.command()
+async def minecraft(ctx,*,raw_args=''):
+    opts=parse_opt(raw_args)
+    if not opts.name:
+        msg = await ctx.send('You want me to show a `minecraft` what?')
+        sent_msgs[ctx.message.id] = [msg.id]
+        return
+    opts.name='minecraft_'+opts.name
+    await show(ctx, raw_or_parsed_args=opts)
+    
 
 @bot.event
 async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
