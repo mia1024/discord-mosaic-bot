@@ -41,22 +41,17 @@ def gen_emoji_sequence(img: Image.Image, large=False, no_space=False, light_mode
     return res
 
 
-def gen_emoji_preview(img: Image.Image):
+def gen_image_preview(img: Image.Image):
     preview = Image.new(img.mode, img.size)
-    if img.mode not in ('RGB', 'RGBA'):
+    if img.mode!='RGBA':
         img = img.convert('RGBA')
     arr = np.array(img)
-    if img.mode == 'RGBA':
-        for y, row in enumerate(arr):
-            for x, col in enumerate(row):
-                r, g, b, a = col
-                preview.putpixel((x, y), (*Color(r, g, b).approx_12bit(), 255 if a else 0))
-    else:
-        for y, row in enumerate(arr):
-            for x, col in enumerate(row):
-                r, g, b = col
-                preview.putpixel((x, y), tuple(Color(r, g, b).approx_12bit()))
-    return preview.resize((img.width * 40, img.height * 40), Image.NEAREST)
+    for y, row in enumerate(arr):
+        for x, col in enumerate(row):
+            r, g, b, a = col
+            preview.putpixel((x, y), (*Color(r, g, b).approx_12bit(), 255 if a else 0))
+    scale=min(1000//img.width,1000//img.height)
+    return preview.resize((img.width * scale, img.height * scale), Image.NEAREST)
 
 
-__all__ = ['gen_emoji_preview', 'gen_emoji_sequence', 'downsample', 'crop']
+__all__ = ['gen_image_preview', 'gen_emoji_sequence', 'downsample', 'crop']
