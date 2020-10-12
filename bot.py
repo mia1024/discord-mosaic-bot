@@ -113,7 +113,7 @@ def parse_opt(s: str):
 
 
 @bot.command()
-async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[ShowOptions,str] = ''):
+async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str,ShowOptions] = ''):
     async with lock_channel(ctx.channel.id):
         if ctx.message.id in interrupted:
             return
@@ -192,6 +192,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[ShowOptions,s
 
 @bot.command()
 async def minecraft(ctx,*,raw_args=''):
+    print(raw_args)
     opts=parse_opt(raw_args)
     if not opts.name:
         msg = await ctx.send('You want me to show a `minecraft` what?')
