@@ -80,8 +80,8 @@ def split_minimal(seq: str, strip_end=True):
 class ShowOptions:
     name: str = None
     large: bool = False
-    no_space: bool = False
-    strip_end: bool = True
+    no_space: bool = True
+    strip_end: bool = False
     light_mode: bool = False
 
 
@@ -94,15 +94,15 @@ def parse_opt(s: str):
             opts.large = True
         elif l[i] == 'light':
             opts.light_mode = True
-        elif l[i] == 'nospace':
-            opts.no_space = True
+        elif l[i] == 'nopadding':
+            opts.strip_end = True
         elif l[i] == 'no':
-            if i < len(l) - 1 and l[i + 1] == 'space':
-                opts.no_space = True
+            if i < len(l) - 1 and l[i + 1] == 'padding':
+                opts.strip_end = True
                 i += 1
         elif l[i] == 'with':
-            if i < len(l) - 1 and l[i + 1] == 'padding':
-                opts.strip_end = False
+            if i < len(l) - 1 and l[i + 1] == 'space':
+                opts.no_space = False
                 i += 1
         else:
             if opts.name is None:
