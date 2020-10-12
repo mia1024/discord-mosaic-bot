@@ -39,7 +39,7 @@ Admittedly, it still looks a little bit weird, but way less so.
 ```
 |show help
 ```
-Display a link to the [help page](https://mosaic.by.jerie.wang/references).
+Display a link to this page. 
 
 ```
 |show $image_name 
