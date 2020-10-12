@@ -1,16 +1,18 @@
-from discord.ext import commands
-import discord
-from asyncio import sleep
-from utils import validate_filename
-from PIL import Image
 import os
+import re
+from asyncio import sleep
+from dataclasses import dataclass
+from typing import List, Union
+
+import aiohttp
+import discord
+from PIL import Image
+from discord.ext import commands
+
 from art import gen_emoji_sequence
 from credentials import MOSAIC_BOT_TOKEN
-from typing import List, Union
 from emojis import get_emoji_by_rgb
-import aiohttp
-import re
-from dataclasses import dataclass
+from utils import validate_filename
 
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
 
@@ -106,19 +108,18 @@ def parse_opt(s: str):
                 i += 1
         else:
             if opts.name is None:
-                opts.name=l[i]
+                opts.name = l[i]
         i += 1
     return opts
 
 
-
 @bot.command()
-async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str,ShowOptions] = ''):
+async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOptions] = ''):
     async with lock_channel(ctx.channel.id):
         if ctx.message.id in interrupted:
             return
-        if isinstance(raw_or_parsed_args,str):
-            raw_args=raw_or_parsed_args
+        if isinstance(raw_or_parsed_args, str):
+            raw_args = raw_or_parsed_args
             if not raw_args:
                 return
             args = raw_args.split()
@@ -128,24 +129,24 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str,ShowOptio
                 sent_msgs[ctx.message.id] = [msg.id]
                 return
             
-            opts=parse_opt(raw_args)
+            opts = parse_opt(raw_args)
             if not opts.name:
-                m='You want me to show a '
+                m = 'You want me to show a '
                 if opts.large:
-                    m+='large '
+                    m += 'large '
                 if opts.no_space:
-                    m+='no space '
+                    m += 'no space '
                     if opts.strip_end and not opts.large:
-                        m+='with padding '
+                        m += 'with padding '
                 if opts.light_mode:
-                    m+='light mode '
-                m+='image of...what?'
+                    m += 'light mode '
+                m += 'image of...what?'
                 msg = await ctx.send(m)
                 sent_msgs[ctx.message.id] = [msg.id]
                 return
         else:
-            opts=raw_or_parsed_args
-            
+            opts = raw_or_parsed_args
+        
         await ctx.trigger_typing()
         if not validate_filename(opts.name):
             msg = await ctx.send(f"Sorry, I don't know what an image of `{opts.name}` looks like. "
@@ -169,7 +170,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str,ShowOptio
         
         emojis = gen_emoji_sequence(img, opts.large, opts.no_space, opts.light_mode)
         if opts.no_space and not opts.large:
-            messages = split_minimal(emojis,opts.strip_end)
+            messages = split_minimal(emojis, opts.strip_end)
         else:
             messages = emojis.splitlines()
         
@@ -190,17 +191,18 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str,ShowOptio
         else:
             sent_msgs[ctx.message.id] = sent
 
+
 @bot.command()
-async def minecraft(ctx,*,raw_args=''):
+async def minecraft(ctx, *, raw_args=''):
     print(raw_args)
-    opts=parse_opt(raw_args)
+    opts = parse_opt(raw_args)
     if not opts.name:
         msg = await ctx.send('You want me to show a `minecraft` what?')
         sent_msgs[ctx.message.id] = [msg.id]
         return
-    opts.name='minecraft_'+opts.name
+    opts.name = 'minecraft_' + opts.name
     await show(ctx, raw_or_parsed_args=opts)
-    
+
 
 @bot.event
 async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
