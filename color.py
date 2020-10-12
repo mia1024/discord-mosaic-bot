@@ -36,11 +36,11 @@ class Color:
         return Color(*tmp)
     
     @classmethod
-    def from_int(cls, n: int, /):
+    def from_int(cls, n: int):
         return Color(*int_to_rgb(n))
     
     @classmethod
-    def from_hex(cls, s: str, /):
+    def from_hex(cls, s: str):
         return Color(int(s[:2], 16), int(s[2:4], 16), int(s[4:], 16))
     
     def __iter__(self):
