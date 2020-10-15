@@ -1,5 +1,5 @@
 from PIL import Image
-from art import downsample, gen_image_preview, gen_emoji_sequence
+from image import downsample, gen_image_preview, gen_emoji_sequence
 from cv import find_scale
 from credentials import MOSAIC_BOT_TOKEN
 import requests
