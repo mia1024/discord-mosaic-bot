@@ -13,6 +13,30 @@ from art import gen_emoji_sequence
 from credentials import MOSAIC_BOT_TOKEN
 from emojis import get_emoji_by_rgb
 from utils import validate_filename
+import logging.handlers
+
+# ---------------- logging ----------------
+
+try:
+    os.mkdir('/var/log/mosaic')
+except FileExistsError:
+    pass
+
+handler = logging.handlers.TimedRotatingFileHandler(
+        filename='/var/log/mosaic/bot.log',
+        when='D',
+        interval=7,
+        backupCount=100,
+        encoding='utf8',
+        delay=True,
+)
+handler.setFormatter(
+        logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+
+# ---------------- logging --------------
 
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
 
@@ -105,26 +129,27 @@ def parse_opt(s: str):
     i = 0
     opts = ShowOptions()
     while i < len(l):
+        set_name = True
         if l[i] == 'large':
             opts.large = True
-            continue
+            set_name = False
         if l[i] == 'light':
             opts.light_mode = True
-            continue
+            set_name = False
         if l[i] == 'nopadding':
             opts.strip_end = True
-            continue
+            set_name = False
         if l[i] == 'no':
             if i < len(l) - 1 and l[i + 1] == 'padding':
                 opts.strip_end = True
-                i += 2
-                continue
+                i += 1
+                set_name = False
         if l[i] == 'with':
             if i < len(l) - 1 and l[i + 1] == 'space':
                 opts.no_space = False
-                i += 2
-                continue
-        if opts.name is None:
+                i += 1
+                set_name = False
+        if opts.name is None and set_name:
             opts.name = l[i]
         i += 1
     return opts
@@ -185,7 +210,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
-        if img.width>80:
+        if img.width > 80:
             # this shouldn't happen because no image wider than 80 should be
             # uploaded but we check it anyway just to be safe
             msg = await ctx.send(
@@ -200,7 +225,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             else:
                 messages = emojis.splitlines()
                 for m in messages:
-                    if len(m)>2000: raise EmojiSequenceTooLong
+                    if len(m) > 2000: raise EmojiSequenceTooLong
         except EmojiSequenceTooLong:
             msg = await ctx.send(
                     f"Sorry, I can't send an image of `{opts.name}` because it's too wide")
@@ -227,7 +252,6 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
 
 @bot.command()
 async def minecraft(ctx, *, raw_args=''):
-    print(raw_args)
     opts = parse_opt(raw_args)
     if not opts.name:
         msg = await ctx.send('You want me to show a `minecraft` what?')
