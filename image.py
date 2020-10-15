@@ -1,8 +1,12 @@
-from emojis import get_emoji_by_rgb
-from PIL import Image
+import base64
+import io
+
 import numpy as np
+from PIL import Image
+
 from color import Color
 from cv import find_scale
+from emojis import get_emoji_by_rgb
 
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:
@@ -41,17 +45,32 @@ def gen_emoji_sequence(img: Image.Image, large=False, no_space=False, light_mode
     return res
 
 
-def gen_image_preview(img: Image.Image):
-    preview = Image.new(img.mode, img.size)
-    if img.mode!='RGBA':
+def gen_image_12bit_approx(img: Image.Image):
+    new_image = Image.new('RGBA', img.size)
+    if img.mode != 'RGBA':
         img = img.convert('RGBA')
     arr = np.array(img)
     for y, row in enumerate(arr):
         for x, col in enumerate(row):
             r, g, b, a = col
-            preview.putpixel((x, y), (*Color(r, g, b).approx_12bit(), 255 if a else 0))
-    scale=min(1000//img.width,1000//img.height)
+            new_image.putpixel((x, y), (*Color(r, g, b).approx_12bit(), 255 if a else 0))
+    return new_image
+
+
+def gen_image_preview(img: Image.Image):
+    preview = gen_image_12bit_approx(img)
+    scale = min(1000 // img.width, 1000 // img.height)
     return preview.resize((img.width * scale, img.height * scale), Image.NEAREST)
 
 
-__all__ = ['gen_image_preview', 'gen_emoji_sequence', 'downsample', 'crop']
+def image_to_data(img: Image.Image, approx_12bit: bool):
+    if approx_12bit:
+        img = gen_image_12bit_approx(img)
+    bio = io.BytesIO()
+    img.save(bio, 'png')
+    bio.seek(0)
+    b64 = base64.b64encode(bio.read()).decode('ascii')
+    return 'data:image/png;base64,' + b64
+
+
+__all__ = ['gen_image_preview', 'gen_emoji_sequence', 'downsample', 'crop', 'image_to_data']

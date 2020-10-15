@@ -1,4 +1,6 @@
+import logging.handlers
 import os
+import random
 import re
 from asyncio import sleep
 from dataclasses import dataclass
@@ -9,11 +11,10 @@ import discord
 from PIL import Image
 from discord.ext import commands
 
-from art import gen_emoji_sequence
+from image import gen_emoji_sequence
 from credentials import MOSAIC_BOT_TOKEN
 from emojis import get_emoji_by_rgb
 from utils import validate_filename
-import logging.handlers
 
 # ---------------- logging ----------------
 
@@ -66,7 +67,7 @@ class lock_channel:
         locks.remove(self.id)
 
 
-async def delete_messages(cid: int, msgs: List[int]):
+async def delete_messages(cid: int, msgs: List[int], bulk=True):
     # the implementation in discord.py requires gateway intent
     # which makes it easier to just implement the API call myself
     if not msgs:
@@ -79,18 +80,29 @@ async def delete_messages(cid: int, msgs: List[int]):
                         'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                     },
             )
-            print(res.headers)
-            print(res.status)
-        else:
-            await session.post(
+        elif bulk:
+            res = await session.post(
                     f'https://discord.com/api/v8/channels/{cid}/messages/bulk-delete',
                     headers={
                         'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                     },
                     json={'messages': msgs}
             )
-        # i don't actually care about the return code because
-        # if MANAGE_MESSAGE permission isn't granted then whatever
+            if res.status != 204:
+                await delete_messages(cid, msgs, bulk=False)
+                # try again using the other end point
+                # because MANAGE_MESSAGES permission
+                # may not present
+        else:
+            random.shuffle(msgs)
+            for mid in msgs:
+                await session.delete(
+                        f'https://discord.com/api/v8/channels/{cid}/messages/{mid}',
+                        headers={
+                            'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
+                        },
+                )
+                await sleep(0.5)
 
 
 class EmojiSequenceTooLong(Exception): pass
