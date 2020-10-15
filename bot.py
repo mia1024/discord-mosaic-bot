@@ -20,6 +20,14 @@ locks = set()
 interrupted = set()
 sent_msgs = {}
 
+HELP_TEXT = """
+```
+|show image_name [with space] [large] [nopadding|no padding]
+|minecraft image_name [with space] [large] [nopadding|no padding]
+```
+For a more detailed description, please visit https://mosaic.by.jerie.wang/references.
+"""
+
 
 class lock_channel:
     def __init__(self, id):
@@ -61,10 +69,15 @@ async def delete_messages(cid: int, msgs: List[int]):
         # if MANAGE_MESSAGE permission isn't granted then whatever
 
 
+class EmojiSequenceTooLong(Exception): pass
+
+
 def split_minimal(seq: str, strip_end=True):
     res = []
     msg = ''
     for line in seq.splitlines():
+        if len(line) > 2000:
+            raise EmojiSequenceTooLong
         if strip_end:
             line = re.sub(f'({get_emoji_by_rgb(255, 255, 255)}|{get_emoji_by_rgb(-1, -1, -1)})+\u200b?$', '\u200b',
                           line)
@@ -94,21 +107,25 @@ def parse_opt(s: str):
     while i < len(l):
         if l[i] == 'large':
             opts.large = True
-        elif l[i] == 'light':
+            continue
+        if l[i] == 'light':
             opts.light_mode = True
-        elif l[i] == 'nopadding':
+            continue
+        if l[i] == 'nopadding':
             opts.strip_end = True
-        elif l[i] == 'no':
+            continue
+        if l[i] == 'no':
             if i < len(l) - 1 and l[i + 1] == 'padding':
                 opts.strip_end = True
-                i += 1
-        elif l[i] == 'with':
+                i += 2
+                continue
+        if l[i] == 'with':
             if i < len(l) - 1 and l[i + 1] == 'space':
                 opts.no_space = False
-                i += 1
-        else:
-            if opts.name is None:
-                opts.name = l[i]
+                i += 2
+                continue
+        if opts.name is None:
+            opts.name = l[i]
         i += 1
     return opts
 
@@ -125,7 +142,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             args = raw_args.split()
             
             if args and args[0] == 'help':
-                msg = await ctx.send('Please refer to https://mosaic.by.jerie.wang/reference for help')
+                msg = await ctx.send(HELP_TEXT)
                 sent_msgs[ctx.message.id] = [msg.id]
                 return
             
@@ -134,10 +151,10 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 m = 'You want me to show a '
                 if opts.large:
                     m += 'large '
-                if opts.no_space:
-                    m += 'no space '
-                    if opts.strip_end and not opts.large:
-                        m += 'with padding '
+                if not opts.no_space:
+                    m += 'with space '
+                    if not opts.strip_end:
+                        m += 'no padding '
                 if opts.light_mode:
                     m += 'light mode '
                 m += 'image of...what?'
@@ -168,11 +185,27 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             sent_msgs[ctx.message.id] = [msg.id]
             return
         
+        if img.width>80:
+            # this shouldn't happen because no image wider than 80 should be
+            # uploaded but we check it anyway just to be safe
+            msg = await ctx.send(
+                    f"Sorry, I can't send an image of `{opts.name}` because it's {img.width - 80} pixels too wide")
+            sent_msgs[ctx.message.id] = [msg.id]
+            return
+        
         emojis = gen_emoji_sequence(img, opts.large, opts.no_space, opts.light_mode)
-        if opts.no_space and not opts.large:
-            messages = split_minimal(emojis, opts.strip_end)
-        else:
-            messages = emojis.splitlines()
+        try:
+            if opts.no_space and not opts.large:
+                messages = split_minimal(emojis, opts.strip_end)
+            else:
+                messages = emojis.splitlines()
+                for m in messages:
+                    if len(m)>2000: raise EmojiSequenceTooLong
+        except EmojiSequenceTooLong:
+            msg = await ctx.send(
+                    f"Sorry, I can't send an image of `{opts.name}` because it's too wide")
+            sent_msgs[ctx.message.id] = [msg.id]
+            return
         
         sent = []
         for i in range(len(messages)):
