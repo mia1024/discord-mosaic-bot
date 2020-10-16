@@ -1,7 +1,7 @@
-from palette import VGA_13H, RGB_4096
+from mosaic_bot.palette import VGA_13H, RGB_4096
 import PIL.Image
 import os
-from color import int_to_rgb
+from mosaic_bot.color import int_to_rgb
 
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 

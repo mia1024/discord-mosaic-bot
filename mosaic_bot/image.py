@@ -4,9 +4,9 @@ import io
 import numpy as np
 from PIL import Image
 
-from color import Color
-from cv import find_scale
-from emojis import get_emoji_by_rgb
+from mosaic_bot.color import Color
+from mosaic_bot.cv import find_scale
+from mosaic_bot.emojis import get_emoji_by_rgb
 
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:

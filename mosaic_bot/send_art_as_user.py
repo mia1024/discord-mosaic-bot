@@ -1,11 +1,11 @@
 from PIL import Image
-from image import downsample, gen_image_preview, gen_emoji_sequence
-from cv import find_scale
-from credentials import MOSAIC_BOT_TOKEN
+from mosaic_bot.image import downsample, gen_image_preview, gen_emoji_sequence
+from mosaic_bot.cv import find_scale
+from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 import requests
 import random
 import time
-from emojis import get_emoji_by_rgb
+from mosaic_bot.emojis import get_emoji_by_rgb
 
 API_ENDPOINT='https://discord.com/api/v8'
 
