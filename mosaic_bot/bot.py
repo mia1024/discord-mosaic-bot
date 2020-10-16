@@ -2,6 +2,7 @@ import logging.handlers
 import os
 import random
 import re
+import sys
 from asyncio import sleep
 from dataclasses import dataclass
 from typing import List, Union
@@ -11,10 +12,10 @@ import discord
 from PIL import Image
 from discord.ext import commands
 
-from image import gen_emoji_sequence
-from credentials import MOSAIC_BOT_TOKEN
-from emojis import get_emoji_by_rgb
-from utils import validate_filename
+from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
+from mosaic_bot.emojis import get_emoji_by_rgb
+from mosaic_bot.image import gen_emoji_sequence
+from mosaic_bot.utils import validate_filename
 
 # ---------------- logging ----------------
 
@@ -24,7 +25,7 @@ except FileExistsError:
     pass
 
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename='/var/log/mosaic/bot.log',
+        filename='/var/log/mosaic/mosaic_bot.log',
         when='D',
         interval=7,
         backupCount=100,

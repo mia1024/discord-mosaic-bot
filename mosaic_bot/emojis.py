@@ -1,4 +1,4 @@
-from color import Color
+from mosaic_bot.color import Color
 
 EMOJIS = {
         Color(0, 0, 0):         "<:000:764291621311217664>",
