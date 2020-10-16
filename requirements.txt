@@ -4,6 +4,7 @@ async-timeout==3.0.1
 attrs==20.2.0
 certifi==2020.6.20
 chardet==3.0.4
+-e git+git@github.com:mia1024/discord-mosaic-bot.git@4d5f796b637d5a0f69742d13dc4b26b16170ef2c#egg=discord_mosaic_bot
 discord.py==1.5.0
 Django==3.1.2
 django-jinja==2.7.0
