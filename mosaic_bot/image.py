@@ -7,6 +7,7 @@ from PIL import Image
 from mosaic_bot.color import Color
 from mosaic_bot.cv import find_scale
 from mosaic_bot.emojis import get_emoji_by_rgb
+import random
 
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:
@@ -71,6 +72,45 @@ def image_to_data(img: Image.Image, approx_12bit: bool):
     bio.seek(0)
     b64 = base64.b64encode(bio.read()).decode('ascii')
     return 'data:image/png;base64,' + b64
+
+
+def gen_icon():
+    img = Image.new("RGBA", (128, 128))
+    
+    for x in range(128):
+        for y in range(128):
+            x_eff = x // 8
+            y_eff = 15 - y // 8  # flip y-axis to math mode
+            
+            r = x_eff
+            g = 9
+            b = y_eff
+            
+            img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))
+    return img
+
+
+def gen_gradient(r: int = None, g: int = None, b: int = None):
+    img = Image.new("RGBA", (16, 16))
+    r0, g0, b0 = r, g, b
+    for x in range(16):
+        for y in range(16):
+            x_eff = x
+            y_eff = 15 - y  # flip y-axis to match math coordinate
+            
+            if r0 is not None:
+                g = x_eff
+                b = y_eff
+            elif g0 is not None:
+                r = x_eff
+                b = y_eff
+            elif b0 is not None:
+                r = x_eff
+                g = y_eff
+            else:
+                raise ValueError("At least one of the r,g,b must be specified")
+            img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))
+    return img
 
 
 __all__ = ['gen_image_preview', 'gen_emoji_sequence', 'downsample', 'crop', 'image_to_data']
