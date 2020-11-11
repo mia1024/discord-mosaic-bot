@@ -9,7 +9,14 @@ Well, this is why the mosaic bot is here! If the image you wanted to send happen
 And, you can make it **even larger**! Like this:
 ![large fireball](screenshots/fireball_large.png)
 
-although...your friends might need some 4k monitors to render it correctly. You've been warned.
+But why stop at the fireball when you can fly
+![rocketship](screenshots/rocketship.png)
+
+above and beyond to the 100m
+![100m](screenshots/100m.png)
+
+where things can be colorful
+![gradient](screenshots/gradient_g11.png)
 
 To give a more direct comparison of the size differences: 
 ![all fireballs](screenshots/all_fireballs.png)
