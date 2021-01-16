@@ -2,12 +2,12 @@ import base64
 import io
 
 import numpy as np
+from scipy import fft
 from PIL import Image
 
 from mosaic_bot.color import Color
 from mosaic_bot.cv import find_scale
 from mosaic_bot.emojis import get_emoji_by_rgb
-import random
 
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:
@@ -113,4 +113,31 @@ def gen_gradient(r: int = None, g: int = None, b: int = None):
     return img
 
 
-__all__ = ['gen_image_preview', 'gen_emoji_sequence', 'downsample', 'crop', 'image_to_data']
+def hash_image(img: Image.Image) -> int:
+    # implemented based on the pHash algorithm in
+    # http://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html
+    # however, since all the images here are already pixel art, no resizing is
+    # necessary
+    
+    img = img.convert('L')
+    arr = np.asarray(img)
+    transformed = fft.dct(fft.dct(arr, axis=0), axis=1)
+    lowest_freq = transformed[1:9, 1:9]
+    res = lowest_freq > np.average(lowest_freq)
+    bits = ''.join(map(str, 1 * res.flatten())).zfill(64)
+    return int(bits, 2)
+
+
+def diff_hash(h1: int, h2: int) -> int:
+    return bin(h1^h2).count('1')
+
+
+__all__ = [
+    'gen_image_preview',
+    'gen_emoji_sequence',
+    'downsample',
+    'crop',
+    'image_to_data',
+    'hash_image',
+    'diff_hash'
+]
