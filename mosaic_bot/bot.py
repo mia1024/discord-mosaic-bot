@@ -28,7 +28,7 @@ except FileExistsError:
     pass
 
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename='/var/log/mosaic/mosaic_bot.log',
+        filename='/var/log/mosaic/mosaic-bot.discord-gateway.log',
         when='D',
         interval=7,
         backupCount=100,
@@ -37,17 +37,27 @@ handler = logging.handlers.TimedRotatingFileHandler(
 )
 handler.setFormatter(
         logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+discord_logger = logging.getLogger('discord')
+discord_logger.setLevel(logging.DEBUG)
+discord_logger.addHandler(handler)
+
+handler = logging.handlers.TimedRotatingFileHandler(
+        filename='/var/log/mosaic/mosaic-bot.log',
+        when='D',
+        interval=7,
+        backupCount=100,
+        encoding='utf8',
+        delay=True,
+)
+handler.setFormatter(
+        logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
+logger=logging.getLogger('mosaic-bot')
+logger.setLevel('debug')
 logger.addHandler(handler)
 
-# ---------------- logging --------------
+# ---------------- end logging --------------
 
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
-
-locks = set()
-interrupted = set()
-sent_msgs = {}
 
 HELP_TEXT = """
 ```
@@ -98,6 +108,7 @@ class MessageManager:
         self.requester: discord.User = ctx.message.author.id
         self.active_managers[self.requesting_message] = self
         self.is_interrupted = False
+        self._queue = []
     
     async def __aenter__(self):
         while self.channel in self.channel_locks:
@@ -109,8 +120,24 @@ class MessageManager:
         self.channel_locks.remove(self.channel)
         # TODO: write sent messages to db
         del self.active_managers[self.requesting_message]
-        if exc_type==RequestInterrupted:
+        if exc_type == RequestInterrupted:
             return True
+    
+    def queue(self, *args, use_webhook=False, **kwargs):
+        self._queue.append((args, {"use_webhook": use_webhook, **kwargs}))
+    
+    async def commit_queue(self):
+        if len(self._queue) <= 5:
+            for msg in self._queue:
+                await self.send(*msg[0], **msg[1])
+        else:
+            for msg in self._queue[:-1]:
+                await self.send(*msg[0], **msg[1], trigger_typing=True)
+                await sleep(1)
+                # while discord.py handles all the rate limits
+                # it looks better to have a uniformed speed
+            msg = self._queue[-1]
+            await self.send(*msg[0], **msg[1])
     
     async def send(self, *args, trigger_typing=False, use_webhook=False, **kwargs):
         if self.is_interrupted:
@@ -130,7 +157,7 @@ class MessageManager:
     
     def interrupt(self):
         self.is_interrupted = True
-        asyncio.ensure_future(delete_messages(self.channel,self.message_ids))
+        asyncio.ensure_future(delete_messages(self.channel, self.message_ids))
     
     @classmethod
     def message_deleted(cls, m_id: int):
@@ -138,19 +165,6 @@ class MessageManager:
             cls.active_managers[m_id].interrupt()
         
         # TODO: check db for sent messages and delete all
-
-
-class lock_channel:
-    def __init__(self, id):
-        self.id = id
-    
-    async def __aenter__(self):
-        while self.id in locks:
-            await sleep(1.5)
-        locks.add(self.id)
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        locks.remove(self.id)
 
 
 async def delete_messages(cid: int, msgs: List[int], bulk=True):
@@ -252,7 +266,7 @@ def parse_opt(s: str):
 
 @bot.command()
 async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOptions] = ''):
-    async with lock_channel(ctx.channel.id):
+    async with MessageManager(ctx) as manager:
         if ctx.message.id in interrupted:
             return
         if isinstance(raw_or_parsed_args, str):
@@ -262,8 +276,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             args = raw_args.split()
             
             if args and args[0] == 'help':
-                msg = await ctx.send(HELP_TEXT)
-                sent_msgs[ctx.message.id] = [msg.id]
+                await manager.send(HELP_TEXT)
                 return
             
             opts = parse_opt(raw_args)
@@ -278,39 +291,34 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 if opts.light_mode:
                     m += 'light mode '
                 m += 'image of...what?'
-                msg = await ctx.send(m)
-                sent_msgs[ctx.message.id] = [msg.id]
+                await manager.send(m)
                 return
         else:
             opts = raw_or_parsed_args
         
         await ctx.trigger_typing()
         if not validate_filename(opts.name):
-            msg = await ctx.send(f"Sorry, I don't know what an image of `{opts.name}` looks like. "
-                                 f"The names of all the images known to me contain only "
-                                 f"alphanumeric characters, hyphens, and underscores")
-            sent_msgs[ctx.message.id] = [msg.id]
+            await manager.send(f"Sorry, I don't know what an image of `{opts.name}` looks like. "
+                               f"The names of all the images known to me contain only "
+                               f"alphanumeric characters, hyphens, and underscores")
             return
         
         if not os.path.exists(f'images/{opts.name}.png'):
-            msg = await ctx.send(f"Sorry, I don't know what an image of `{opts.name}` looks like")
-            sent_msgs[ctx.message.id] = [msg.id]
+            await manager.send(f"Sorry, I don't know what an image of `{opts.name}` looks like")
             return
         
         img = Image.open(f'images/{opts.name}.png')
         if opts.large and img.width > 27:
             # discord displays all lines above 27 emojis as inline
-            msg = await ctx.send(
+            await manager.send(
                     f"Sorry, I can't send a large image of `{opts.name}` because it's {img.width - 27} pixels too wide")
-            sent_msgs[ctx.message.id] = [msg.id]
             return
         
         if img.width > 80:
             # this shouldn't happen because no image wider than 80 should be
             # uploaded but we check it anyway just to be safe
-            msg = await ctx.send(
+            await manager.send(
                     f"Sorry, I can't send an image of `{opts.name}` because it's {img.width - 80} pixels too wide")
-            sent_msgs[ctx.message.id] = [msg.id]
             return
         
         emojis = gen_emoji_sequence(img, opts.large, opts.no_space, opts.light_mode)
@@ -322,36 +330,21 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 for m in messages:
                     if len(m) > 2000: raise EmojiSequenceTooLong
         except EmojiSequenceTooLong:
-            msg = await ctx.send(
+            await manager.send(
                     f"Sorry, I can't send an image of `{opts.name}` because it's too wide")
-            sent_msgs[ctx.message.id] = [msg.id]
             return
-        
-        sent = []
         for i in range(len(messages)):
-            if ctx.message.id in interrupted:
-                break
-            sent.append((await ctx.send(messages[i])).id)
-            if i != len(messages) - 1:
-                await ctx.trigger_typing()
-                await sleep(1)
-            # while discord.py handles all the rate limits
-            # it looks better to have a uniformed speed
-        
-        if ctx.message.id in interrupted:
-            interrupted.remove(ctx.message.id)
-            await delete_messages(ctx.channel.id, sent)
-        else:
-            sent_msgs[ctx.message.id] = sent
+            manager.queue(messages[i], use_webhook=True)
+        await manager.commit_queue()
 
 
 @bot.command()
 async def minecraft(ctx, *, raw_args=''):
     opts = parse_opt(raw_args)
     if not opts.name:
-        msg = await ctx.send('You want me to show a `minecraft` what?')
-        sent_msgs[ctx.message.id] = [msg.id]
-        return
+        async with MessageManager(ctx) as manager:
+            await manager.send('You want me to show a `minecraft` what?')
+            return
     opts.name = 'minecraft_' + opts.name
     await show(ctx, raw_or_parsed_args=opts)
 
@@ -373,19 +366,15 @@ async def gradient(ctx: commands.Context, *, raw_args=''):
         if opts.large:
             seq = emojis.splitlines()
             for msg in seq:
-                await manager.send(msg, use_webhook=True)
-                await sleep(1)
+                manager.queue(msg, use_webhook=True)
         else:
             for i in range(4):
-                await manager.send('\n'.join(emojis.splitlines()[i * 4:i * 4 + 4]), use_webhook=True)
+                manager.queue('\n'.join(emojis.splitlines()[i * 4:i * 4 + 4]), use_webhook=True)
+        await manager.commit_queue()
 
 
 @bot.event
 async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
-    if e.channel_id in locks:
-        interrupted.add(e.message_id)
-    elif e.message_id in sent_msgs:
-        await delete_messages(e.channel_id, sent_msgs[e.message_id])
     MessageManager.message_deleted(e.message_id)
 
 
@@ -393,7 +382,6 @@ async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
 async def on_ready():
     print('Logged in as ' + bot.user.name + '#' + bot.user.discriminator)
     await bot.change_presence(activity=discord.Activity(name='|show help', type=discord.ActivityType.playing))
-    await get_webhook(764939692478431232)
 
 
 if __name__ == '__main__':
