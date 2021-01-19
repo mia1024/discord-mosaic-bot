@@ -14,6 +14,7 @@ CREATE TABLE mosaic_bot
     channel               INTEGER NOT NULL,
     image_requested       INTEGER NOT NULL,
     time_requested        DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    response_messages     TEXT    NOT NULL, -- a serialized list
     FOREIGN KEY (image_requested) REFERENCES images (hash)
 );
 COMMIT;
