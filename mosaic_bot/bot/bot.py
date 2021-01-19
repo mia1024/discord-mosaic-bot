@@ -1,13 +1,11 @@
 import logging.handlers
 import os
 import random
-import re
-import sys
+import time
 from asyncio import sleep
 import asyncio
 from dataclasses import dataclass
 from typing import List, Union, Dict
-import sqlite3
 import aiohttp
 import discord
 from PIL import Image
@@ -16,9 +14,9 @@ import re
 
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.emojis import get_emoji_by_rgb
-from mosaic_bot.image import gen_emoji_sequence, gen_gradient
-from mosaic_bot.utils import validate_filename
-import pathlib
+from mosaic_bot.image import gen_emoji_sequence, gen_gradient, image_to_data
+from .utils import validate_filename
+from mosaic_bot import BASE_PATH
 
 # ---------------- logging ----------------
 
@@ -51,8 +49,8 @@ handler = logging.handlers.TimedRotatingFileHandler(
 )
 handler.setFormatter(
         logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
-logger=logging.getLogger('mosaic-bot')
-logger.setLevel('debug')
+logger = logging.getLogger('mosaic-bot')
+logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
 # ---------------- end logging --------------
@@ -67,14 +65,8 @@ HELP_TEXT = """
 For a more detailed description, please visit https://mosaic.by.jerie.wang/references.
 """
 
-BASE_PATH = pathlib.Path(__file__).resolve().parent.parent
 ICON = (f := open(BASE_PATH / 'icon.png', 'br')).read()
 f.close()
-
-
-def get_db():
-    db = sqlite3.connect(str((BASE_PATH / 'db.sqlite3')))
-    return db
 
 
 async def get_webhook(channel_id: int) -> discord.Webhook:
@@ -109,6 +101,8 @@ class MessageManager:
         self.active_managers[self.requesting_message] = self
         self.is_interrupted = False
         self._queue = []
+        self.rtt = []  # round trip time
+        self.show_confirmation = False
     
     async def __aenter__(self):
         while self.channel in self.channel_locks:
@@ -117,47 +111,123 @@ class MessageManager:
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.show_confirmation:
+            # a confirmation message used to toggle off the typing indicator,
+            # if triggered
+            
+            if exc_type is None:
+                confirmation = await self.destination.send(f'<@{self.requester}> Request completed')
+            else:
+                confirmation = await self.destination.send(f'<@{self.requester}> Request interrupted')
+            await confirmation.delete(delay=5)
+        
         self.channel_locks.remove(self.channel)
         # TODO: write sent messages to db
         del self.active_managers[self.requesting_message]
         if exc_type == RequestInterrupted:
+            await delete_messages(self.channel, self.message_ids)
             return True
     
     def queue(self, *args, use_webhook=False, **kwargs):
         self._queue.append((args, {"use_webhook": use_webhook, **kwargs}))
     
-    async def commit_queue(self):
-        if len(self._queue) <= 5:
-            for msg in self._queue:
-                await self.send(*msg[0], **msg[1])
+    def get_embed(self, current, url):
+        total = len(self._queue)
+        if not self.rtt:
+            rtt = 0
+            avg_rtt = 0
         else:
-            for msg in self._queue[:-1]:
-                await self.send(*msg[0], **msg[1], trigger_typing=True)
-                await sleep(1)
-                # while discord.py handles all the rate limits
-                # it looks better to have a uniformed speed
-            msg = self._queue[-1]
-            await self.send(*msg[0], **msg[1])
+            rtt = self.rtt[-1]
+            avg_rtt = sum(self.rtt) / len(self.rtt)
+        
+        if total > 30:
+            delay = 1.5
+        else:
+            delay = 1
+        
+        return discord.Embed.from_dict(
+                {
+                    'description': 'Delete the requesting message to interrupt',
+                    'fields': [
+                        {
+                            'name': 'ETA',
+                            'value': f'{round((total - current) * delay + avg_rtt, 2)}s',
+                            'inline': 'true'
+                        },
+                        {
+                            'name': 'Latency',
+                            'value': f'{round(rtt, 2)}s',
+                            'inline': 'true'
+                        },
+                        {
+                            'name': 'Progress',
+                            'value': f'{round(current / total * 100, 2)}%',
+                            'inline': 'true'
+                        },
+                    ],
+                }
+        )
+    
+    async def commit_queue(self, img: Image.Image):
+        if len(self._queue) <= 5:
+            self.show_confirmation = False
+            for msg in self._queue:
+                asyncio.ensure_future(self.send(*msg[0], **msg[1]))
+                # i think this shouldn't cause messages to deliver out of
+                # order...i think
+        else:
+            self.show_confirmation = True
+            start = time.time()
+            status = await self.destination.send(embed=self.get_embed(0, ''))
+            self.rtt.append(time.time() - start)
+            # apparently webhook shares the same rate limit???
+            
+            if len(self._queue) > 30:
+                delay = 1.5
+            else:
+                delay = 1
+            try:
+                for i, msg in enumerate(self._queue[:-1]):
+                    start = time.time()
+                    await self.send(*msg[0], **msg[1], trigger_typing=True)
+                    
+                    rtt = time.time() - start
+                    self.rtt.append(rtt)
+                    
+                    # asyncio.ensure_future(
+                    #         status.edit(embed=self.get_embed(i + 1, ''))
+                    # )
+                    # don't use await since this can be executed while sleeping
+                    
+                    await sleep(delay - rtt)
+                    # while discord.py handles all the rate limits
+                    # it looks better to have a uniformed speed
+                
+                msg = self._queue[-1]
+                await self.send(*msg[0], **msg[1])
+            finally:
+                await status.delete()
     
     async def send(self, *args, trigger_typing=False, use_webhook=False, **kwargs):
-        if self.is_interrupted:
-            raise RequestInterrupted
-            # this will be caught in the __aexit__ function and silenced
-            # raise this exception to interrupt the normal code flow
-            # to save some CPU power.
         if use_webhook:
             wh = await get_webhook(self.channel)
             msg = await wh.send(*args, wait=True)
         else:
             msg = await self.destination.send(*args, **kwargs)
+        self.message_ids.append(msg.id)
+        
+        if self.is_interrupted:
+            # raise exception after sending a message to toggle off the typing
+            # indicator. this exception will be caught by __aexit__() of this
+            # class
+            raise RequestInterrupted
+        
         if trigger_typing:
             await self.destination.trigger_typing()
-        self.message_ids.append(msg.id)
         return msg
     
     def interrupt(self):
         self.is_interrupted = True
-        asyncio.ensure_future(delete_messages(self.channel, self.message_ids))
     
     @classmethod
     def message_deleted(cls, m_id: int):
@@ -212,8 +282,7 @@ def split_minimal(seq: str, strip_end=True):
         if len(line) > 2000:
             raise EmojiSequenceTooLong
         if strip_end:
-            line = re.sub(f'({get_emoji_by_rgb(255, 255, 255)}|{get_emoji_by_rgb(-1, -1, -1)})+\u200b?$', '\u200b',
-                          line)
+            line = re.sub(f'({get_emoji_by_rgb(-1, -1, -1)})+\u200b?$', '\u200b', line)
         if len(msg) + len(line) < 2000:
             msg += line + '\n'
         else:
@@ -229,8 +298,7 @@ class ShowOptions:
     name: str = None
     large: bool = False
     no_space: bool = True
-    strip_end: bool = False
-    light_mode: bool = False
+    strip_end: bool = True
 
 
 def parse_opt(s: str):
@@ -242,17 +310,6 @@ def parse_opt(s: str):
         if l[i] == 'large':
             opts.large = True
             set_name = False
-        if l[i] == 'light':
-            opts.light_mode = True
-            set_name = False
-        if l[i] == 'nopadding':
-            opts.strip_end = True
-            set_name = False
-        if l[i] == 'no':
-            if i < len(l) - 1 and l[i + 1] == 'padding':
-                opts.strip_end = True
-                i += 1
-                set_name = False
         if l[i] == 'with':
             if i < len(l) - 1 and l[i + 1] == 'space':
                 opts.no_space = False
@@ -267,8 +324,6 @@ def parse_opt(s: str):
 @bot.command()
 async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOptions] = ''):
     async with MessageManager(ctx) as manager:
-        if ctx.message.id in interrupted:
-            return
         if isinstance(raw_or_parsed_args, str):
             raw_args = raw_or_parsed_args
             if not raw_args:
@@ -288,26 +343,23 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                     m += 'with space '
                     if not opts.strip_end:
                         m += 'no padding '
-                if opts.light_mode:
-                    m += 'light mode '
                 m += 'image of...what?'
                 await manager.send(m)
                 return
         else:
             opts = raw_or_parsed_args
         
-        await ctx.trigger_typing()
         if not validate_filename(opts.name):
             await manager.send(f"Sorry, I don't know what an image of `{opts.name}` looks like. "
                                f"The names of all the images known to me contain only "
                                f"alphanumeric characters, hyphens, and underscores")
             return
         
-        if not os.path.exists(f'images/{opts.name}.png'):
+        if not os.path.exists(BASE_PATH / f'images/{opts.name}.png'):
             await manager.send(f"Sorry, I don't know what an image of `{opts.name}` looks like")
             return
         
-        img = Image.open(f'images/{opts.name}.png')
+        img = Image.open(BASE_PATH / f'images/{opts.name}.png')
         if opts.large and img.width > 27:
             # discord displays all lines above 27 emojis as inline
             await manager.send(
@@ -321,7 +373,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                     f"Sorry, I can't send an image of `{opts.name}` because it's {img.width - 80} pixels too wide")
             return
         
-        emojis = gen_emoji_sequence(img, opts.large, opts.no_space, opts.light_mode)
+        emojis = gen_emoji_sequence(img, opts.large, opts.no_space)
         try:
             if opts.no_space and not opts.large:
                 messages = split_minimal(emojis, opts.strip_end)
@@ -335,7 +387,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             return
         for i in range(len(messages)):
             manager.queue(messages[i], use_webhook=True)
-        await manager.commit_queue()
+        await manager.commit_queue(img)
 
 
 @bot.command()
@@ -382,7 +434,3 @@ async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
 async def on_ready():
     print('Logged in as ' + bot.user.name + '#' + bot.user.discriminator)
     await bot.change_presence(activity=discord.Activity(name='|show help', type=discord.ActivityType.playing))
-
-
-if __name__ == '__main__':
-    bot.run(MOSAIC_BOT_TOKEN)

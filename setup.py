@@ -5,6 +5,6 @@ setuptools.setup(
         author='Jerie Wang',
         url='https://mosaic.by.jerie.wang/',
         author_email='mail@jerie.wang',
-        python_requires='>=3.7',
+        python_requires='>=3.9',
         version=open('VERSION').read()
 )

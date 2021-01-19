@@ -4107,7 +4107,7 @@ def get_emoji_by_rgb(r: int, g: int, b: int):
     the background emoji
     '''
     if r == -1 and g == -1 and b == -1:
-        return "<:bg:764304162296168479>"
+        return "<:bg:800553150922752032>"
     return EMOJIS[Color(r, g, b).approx_12bit()]
 
 __all__ = ['get_emoji_by_rgb']

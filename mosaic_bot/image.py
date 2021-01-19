@@ -12,7 +12,7 @@ from mosaic_bot.emojis import get_emoji_by_rgb
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:
     if not scale:
-        scale = find_scale(img)
+        scale = find_scale(img, debug=True)
     return img.resize((img.size[0] // scale, img.size[1] // scale), Image.NEAREST)
 
 
@@ -20,9 +20,22 @@ def crop(img: Image.Image) -> Image.Image:
     return img.crop(img.getbbox())
 
 
+def preprocess(img: Image.Image, debug: bool = False, scale=None):
+    if scale is None:
+        if debug:
+            scale, data = find_scale(img, True)
+        else:
+            scale = find_scale(img)
+    img = crop(downsample(img, scale)).convert('RGBA')
+    try:
+        return img, data
+    except NameError:
+        return img
+
+
 # single line emojis will be rendered small >= 28
 
-def gen_emoji_sequence(img: Image.Image, large=False, no_space=False, light_mode=False):
+def gen_emoji_sequence(img: Image.Image, large=False, no_space=False):
     # all images passed in should be preprocessed images
     # ie. RGBA, downsampled
     res = ''
@@ -31,10 +44,7 @@ def gen_emoji_sequence(img: Image.Image, large=False, no_space=False, light_mode
         for col in row:
             r, g, b, a = col
             if a == 0:
-                if light_mode:
-                    emoji = get_emoji_by_rgb(255, 255, 255)
-                else:
-                    emoji = get_emoji_by_rgb(-1, -1, -1)
+                emoji = get_emoji_by_rgb(-1, -1, -1)
             else:
                 emoji = get_emoji_by_rgb(r, g, b)
             res += emoji
@@ -118,18 +128,18 @@ def hash_image(img: Image.Image) -> int:
     # http://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html
     # however, since all the images here are already pixel art, no resizing is
     # necessary
+    # Additional ref: https://www.phash.org/docs/pubs/thesis_zauner.pdf
     
     img = img.convert('L')
     arr = np.asarray(img)
-    transformed = fft.dct(fft.dct(arr, axis=0), axis=1)
+    transformed = fft.dct(fft.dct(arr, axis=0, norm='ortho'), axis=1, norm='ortho')
     lowest_freq = transformed[1:9, 1:9]
-    res = lowest_freq > np.average(lowest_freq)
-    bits = ''.join(map(str, 1 * res.flatten())).zfill(64)
-    return int(bits, 2)
+    bits = 1 * (lowest_freq > np.average(lowest_freq)).flatten()
+    return int(''.join(map(str, bits)).zfill(64), 2)
 
 
 def diff_hash(h1: int, h2: int) -> int:
-    return bin(h1^h2).count('1')
+    return bin(h1 ^ h2).count('1')
 
 
 __all__ = [
