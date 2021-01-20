@@ -11,7 +11,7 @@ class ScaleCandidate:
         self.scale = scale
         self.score = score
         self.align = -1
-        self.shade: np.ndarray = None
+        self.shade: Union[np.array, Image.Image] = None
     
     def __str__(self):
         return str(self.scale)
@@ -64,7 +64,7 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
         if cropped.width / n > 80 or cropped.width / n < 8:
             # noise
             continue
-            
+        
         candidates.append(ScaleCandidate(n, occ))
         if n > 1:
             candidates.append(ScaleCandidate(n - 1, occ))
@@ -74,10 +74,9 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
         # because of the compression artifact
     
     candidates.sort(key=lambda c: c.scale)
+    
     while True:
-        # deduct the relationships between candidates.
-        # there should be larger blocks of pixels that are multiples
-        # of the correct scale due to the nature of pixel arts
+        # merge all the duplicate candidates from the last step
         for i in range(len(candidates) - 1):
             if candidates[i].scale == candidates[i + 1].scale:
                 candidates[i].score += candidates[i + 1].score
@@ -94,6 +93,9 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
         c.score += (cropped.width / c.scale).is_integer() * 2
         c.score += (cropped.height / c.scale).is_integer()
         for d in candidates:
+            # deduce the relationships between candidates.
+            # there should be larger blocks of pixels that are multiples
+            # of the correct scale due to the nature of pixel arts
             c.score += (d.scale / c.scale).is_integer()
     
     if cropped.width <= 64:
@@ -153,21 +155,32 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
         total_values = np.sum(aligned_source)
         
         c.align = (total_values - total_diff) / total_values
+        # using colored diff instead of binary because the feathered pixels
+        # around each "pixel" in the source file should have similar color
+        # to the resized ones, therefore should incur less alignment penalty
+        # than the drastically different color.
         c.score += round(c.align * align_factor, 2)
         
         if debug:
             shade = np.sum(diff, axis=2) // 3
             shade = cv2.cvtColor(shade.astype(np.uint8), cv2.COLOR_GRAY2RGBA)
-            shade[:, :, 3] = diff[:, :, 3]  # restore the alpha channel
-            shade[:, :, 1] = 0  # set it to yellow
+            
+            # set the non-shaded pixels to transparent
+            shade[:, :, 3] = np.where(shade[:, :, 0] > 0,
+                                      np.full(shade.shape[:2], 255),
+                                      np.zeros(shade.shape[:2]))
+            
+            shade[:, :, 1] = 0  # set it to magenta
+            
             container = np.zeros(debug_data.labeled.shape, dtype=np.uint8)
             container[corner[1]:h + corner[1], corner[0]:w + corner[0]] = \
                 shade[:h, :w]
             
-            c.shade = cv2.cvtColor(
-                    cv2.addWeighted(debug_data.labeled, 1, container, 1, 0),
-                    cv2.COLOR_BGRA2RGBA
-            )
+            c.shade = Image.fromarray(
+                    cv2.cvtColor(
+                            cv2.addWeighted(debug_data.labeled, 1, container, 1, 0),
+                            cv2.COLOR_BGRA2RGBA
+                    ))
         
         if c.align >= 0.99:
             c.score += align_factor * c.align
@@ -182,12 +195,10 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
     
     if debug:
         debug_data.candidates = candidates
-        debug_data.labeled = Image.fromarray(debug_data.labeled)
+        debug_data.labeled = Image.fromarray(
+                cv2.cvtColor(debug_data.labeled, cv2.COLOR_BGRA2RGBA)
+        )
         return candidates[0].scale, debug_data
 
-import time
-start=time.time()
-print(find_scale(Image.open('../test_images/rocketship.png'), True)[1].candidates)
-print(time.time()-start)
 
 __all__ = ['find_scale', 'DebugData']
