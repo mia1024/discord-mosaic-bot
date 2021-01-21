@@ -2,7 +2,6 @@ import base64
 import io
 
 import numpy as np
-from scipy import fft
 from PIL import Image
 
 from mosaic_bot.color import Color
@@ -35,7 +34,7 @@ def preprocess(img: Image.Image, debug: bool = False, scale=None):
 
 # single line emojis will be rendered small >= 28
 
-def gen_emoji_sequence(img: Image.Image, large=False, no_space=False):
+def gen_emoji_sequence(img: Image.Image, large=False, with_space=False):
     # all images passed in should be preprocessed images
     # ie. RGBA, downsampled
     res = ''
@@ -48,7 +47,7 @@ def gen_emoji_sequence(img: Image.Image, large=False, no_space=False):
             else:
                 emoji = get_emoji_by_rgb(r, g, b)
             res += emoji
-            if not no_space:
+            if with_space:
                 res += ' '
         if not large:
             res += '\u200b'
@@ -123,31 +122,10 @@ def gen_gradient(r: int = None, g: int = None, b: int = None):
     return img
 
 
-def hash_image(img: Image.Image) -> int:
-    # implemented based on the pHash algorithm in
-    # http://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html
-    # however, since all the images here are already pixel art, no resizing is
-    # necessary
-    # Additional ref: https://www.phash.org/docs/pubs/thesis_zauner.pdf
-    
-    img = img.convert('L')
-    arr = np.asarray(img)
-    transformed = fft.dct(fft.dct(arr, axis=0, norm='ortho'), axis=1, norm='ortho')
-    lowest_freq = transformed[1:9, 1:9]
-    bits = 1 * (lowest_freq > np.average(lowest_freq)).flatten()
-    return int(''.join(map(str, bits)).zfill(64), 2)
-
-
-def diff_hash(h1: int, h2: int) -> int:
-    return bin(h1 ^ h2).count('1')
-
-
 __all__ = [
     'gen_image_preview',
     'gen_emoji_sequence',
     'downsample',
     'crop',
     'image_to_data',
-    'hash_image',
-    'diff_hash'
 ]
