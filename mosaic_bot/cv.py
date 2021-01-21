@@ -32,6 +32,8 @@ class DebugData:
         return f'<{self.candidates}>'
 
 
+class NoScaleFound(Exception):pass
+
 def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) \
         -> Union[int, tuple[int, DebugData]]:
     cropped = PIL_image.crop(PIL_image.getbbox())
@@ -104,6 +106,9 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
             if c.scale == 1: break
         else:
             candidates.append(ScaleCandidate(1, 1))
+    
+    if not candidates:
+        raise NoScaleFound
     
     align_factor = max(candidates, key=lambda c: c.score).score * 5
     

@@ -143,3 +143,4 @@ cython_debug/
 credentials.py
 images/
 test_images/
+new_images/
