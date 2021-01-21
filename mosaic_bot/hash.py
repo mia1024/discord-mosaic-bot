@@ -54,8 +54,8 @@ def hash_image(img: Image.Image) -> int:
     freq = fft.dct(
             fft.dct(arr, axis=0, norm='ortho'),
             axis=1, norm='ortho'
-    )[1:9, 1:9]
-    return int.from_bytes(np.packbits(freq > np.average(freq)), 'big')
+    )[:12, :12]
+    return int.from_bytes(np.packbits(freq > np.average(freq[1:,1:])), 'big')
 
 
 __all__ = ['diff_hash', 'encode_hash', 'decode_hash', 'compute_image_path_from_hash', 'hash_image']
