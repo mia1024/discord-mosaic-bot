@@ -6,7 +6,8 @@ import shutil
 from mosaic_bot.hash import hash_image
 
 conflicts = []
-shutil.rmtree(BASE_PATH / 'new_images')
+if os.path.exists(BASE_PATH/'new_images'):
+    shutil.rmtree(BASE_PATH / 'new_images')
 os.mkdir(BASE_PATH / 'new_images')
 for file in os.listdir(BASE_PATH / 'images'):
     if not file.endswith('.png'):

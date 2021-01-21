@@ -39,6 +39,16 @@ class UInt64(TypeDecorator):
         return c_uint64(value).value
 
 
+class Hash(TypeDecorator):
+    impl = String
+    
+    def process_bind_param(self, value: int, dialect) -> str:
+        return str(value)
+    
+    def process_result_value(self, value: str, dialect) -> int:
+        return int(value)
+
+
 class User(Base):
     __tablename__ = 'users'
     
@@ -52,7 +62,7 @@ class Image(Base):
     __tablename__ = 'images'
     
     name = Column(String, nullable=False, unique=True)
-    hash = Column(UInt64, primary_key=True)
+    hash = Column(Hash, primary_key=True)
     uploaded_by = Column(UInt64)
     time_uploaded = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -86,7 +96,7 @@ User.metadata.create_all(engine)
 Response.metadata.create_all(engine)
 
 
-def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 5) -> None:
+def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 10) -> None:
     session = Session()
     hash = hash_image(img)
     
@@ -100,7 +110,6 @@ def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 5) -> Non
 
 @lru_cache(100)
 def get_image_path(hash: int) -> str:
-    hash = c_uint64(hash).value  # in case of malicious hash input
     session = Session()
     
     # this will raise an exception if hash doesn't exist
@@ -137,7 +146,7 @@ def get_request(msg: int) -> Request:
     s = Session()
     
     req = s.query(Response.requesting_message).filter(Response.response == msg)
-    return s.query(Request).filter(or_(Request.requesting_message==req,Request.requesting_message==msg)).one()
+    return s.query(Request).filter(or_(Request.requesting_message == req, Request.requesting_message == msg)).one()
 
 
 def get_associated_messages(msg: int):
