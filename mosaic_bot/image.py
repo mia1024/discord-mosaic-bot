@@ -99,23 +99,31 @@ def gen_icon():
     return img
 
 
-def gen_gradient(r: int = None, g: int = None, b: int = None):
+def gen_gradient(r: int = None, g: int = None, b: int = None, x='+', y='+'):
+    """
+    Using math coordinate. When either x or y or both is -, the the axis
+    is flipped and the origin is recalculated accordingly
+    """
     img = Image.new("RGBA", (16, 16))
     r0, g0, b0 = r, g, b
+    
+    x_pos = x == '+'
+    y_pos = y == '+'
+    
     for x in range(16):
         for y in range(16):
             x_eff = x
             y_eff = 15 - y  # flip y-axis to match math coordinate
             
             if r0 is not None:
-                g = x_eff
-                b = y_eff
+                g = x_eff if x_pos else 15 - x
+                b = y_eff if y_pos else 15 - y
             elif g0 is not None:
-                r = x_eff
-                b = y_eff
+                r = x_eff if x_pos else 15 - x
+                b = y_eff if y_pos else 15 - y
             elif b0 is not None:
-                r = x_eff
-                g = y_eff
+                r = x_eff if x_pos else 15 - x
+                g = y_eff if y_pos else 15 - y
             else:
                 raise ValueError("At least one of the r,g,b must be specified")
             img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))

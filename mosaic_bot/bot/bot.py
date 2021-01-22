@@ -14,9 +14,8 @@ import aiohttp
 import discord
 from PIL import Image
 from discord.ext import commands
-from hashlib import sha1
 
-from mosaic_bot import BASE_PATH, db, __version__
+from mosaic_bot import BASE_PATH, db, __version__, __build__
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.emojis import get_emoji_by_rgb
 from mosaic_bot.image import gen_emoji_sequence, gen_gradient
@@ -62,7 +61,7 @@ logger.addHandler(stream)
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
 
 HELP_TEXT = f"""
-This is mosaic bot, v{__version__}.
+This is mosaic bot v{__version__}, build {__build__}.
 
 For a description of available commands, please visit https://mosaic.by.jerie.wang/references.
 
@@ -86,7 +85,7 @@ async def get_webhook(channel_id: int) -> discord.Webhook:
             webhook = wh
             break
     else:
-        logger.info(f'No webhook for channel {channel.id} (#{channel.name}), creating')
+        logger.info(f'No webhook for channel {channel.id}, creating')
         webhook = await channel.create_webhook(name=bot.user.name, avatar=ICON,
                                                reason='webhook is necessary for sending custom external emojis')
     return webhook
@@ -120,7 +119,7 @@ class MessageManager:
             logger.info('MessageManager: waiting for channel lock to release')
             await sleep(1.5)
         self.channel_locks.add(self.channel)
-        logger.info(f'Locking channel {self.channel} (#{self.destination.channel.name})')
+        logger.info(f'Locking channel {self.channel}')
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -139,10 +138,9 @@ class MessageManager:
             await self.send('Unexpected error while processing your request, please try again later. '
                             'If this error persists, please consider submitting a bug report in my '
                             'official server (<https://discord.gg/AQJac7JN8n>).')
-            logger.error('Error while processing command. Stacktrace:')
-            logger.error(traceback.format_exc())
+            logger.error('Error while processing command')
         
-        logger.info(f'Releasing channel lock for {self.channel} (#{self.destination.channel.name})')
+        logger.info(f'Releasing channel lock for {self.channel}')
         self.channel_locks.remove(self.channel)
         
         del self.active_managers[self.requesting_message]
@@ -258,7 +256,7 @@ class MessageManager:
     
     async def send(self, *args, trigger_typing=False, use_webhook=False, **kwargs):
         if use_webhook:
-            logger.debug('Using webhook')
+            logger.debug('Sending message with webhook')
             wh = await get_webhook(self.channel)
             msg = await wh.send(*args, wait=True, **kwargs)
         else:
@@ -286,6 +284,7 @@ class MessageManager:
         
         msgs = db.get_associated_messages(m_id)
         if not msgs:
+            logger.debug(f'No associated message found for {m_id}')
             return
         logger.info(f'Deleting messages associated to request {msgs[-1]}')
         
@@ -463,18 +462,47 @@ async def gradient(ctx: commands.Context, *, raw_args=''):
     async with MessageManager(ctx) as manager:
         log_command_enter(ctx, 'gradient', raw_args)
         opts = parse_opt(raw_args)
-        c = re.search(r'\b(?P<c>[rgb]|red|green|blue)=(?P<v>\d{1,2})\b', raw_args)
-        if c is None:
+        gradient_opts = {}
+        color_found = False
+        
+        for o in opts.name.split():
+            try:
+                k, v = o.split('=')
+                if k in ('r', 'g', 'b', 'red', 'green', 'blue'):
+                    if not color_found:
+                        color_found = True
+                        v = int(v, 0)
+                        if not 0 <= v <= 15:
+                            await manager.send("You see, I only know 16 values in this color so I can't do that")
+                            logger.info('Invalid gradient range, aborting')
+                            return
+                        gradient_opts[k] = v
+                    else:
+                        await manager.send("Hey, um, so you specified more than one "
+                                           "color to remain the same. Surely you don't"
+                                           " want a single strip of colors?")
+                        logger.info('Invalid gradient color, aborting')
+                        return
+                elif k in ('x', 'y'):
+                    if v not in ('+', '-'):
+                        await manager.send("The direction can only be either + or -, there's nothing in between")
+                        logger.info('Invalid gradient direction, aborting')
+                    gradient_opts[k] = v
+                else:
+                    raise ValueError
+            except:
+                await manager.send("Hey, um, sorry to break this to you but "
+                                   f"I can't quite understand what you meant by `{o}`")
+                logger.info('Unrecognized gradient option, aborting')
+                return
+        if not color_found:
             await manager.send("You need to specify a base color because, "
                                "unfortunately, you humans can't see a message in 3D if I send one")
             logger.info('Invalid gradient color, aborting')
             return
-        if not 0 <= int(c.group('v')) <= 15:
-            await manager.send("You see, I only know 16 colors so I can't do that")
-            logger.info('Invalid gradient range, aborting')
-            return
-        color = {c.group('c')[0]: int(c.group('v'))}
-        img = gen_gradient(**color)
+        logger.info('Generating gradient, options:')
+        logger.info(gradient_opts)
+        img = gen_gradient(**gradient_opts)
         emojis = gen_emoji_sequence(img, opts.large, opts.with_space)
         if opts.large or opts.multiline:
             seq = emojis.splitlines()
@@ -525,6 +553,7 @@ async def delete(ctx: commands.Context, *, raw_args=''):
 
 @bot.event
 async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
+    logger.debug(f'Raw message delete event received for message {e.message_id}')
     MessageManager.message_deleted(e.channel_id, e.message_id)
 
 
@@ -544,12 +573,16 @@ async def on_disconnect():
     logger.info('Disconnected from Discord gateway')
 
 
+@bot.event
+async def on_error(e, *args, **kwargs):
+    logger.error(f'Error while handling event {e}')
+    logger.error(f'args {args}')
+    logger.error(f'kwargs {kwargs}')
+    logger.error(traceback.format_exc())
+
+
 def run_bot(token, *args, **kwargs):
-    hasher = sha1()
-    source = open(__file__, 'rb')
-    hasher.update(source.read())
-    source.close()
-    logger.info(f'Starting mosaic bot {__version__}, build {hasher.hexdigest()}')
+    logger.info(f'Starting mosaic bot v{__version__}, build {__build__}')
     bot.run(token, *args, **kwargs)
 
 
