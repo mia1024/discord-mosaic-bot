@@ -1,7 +1,6 @@
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.bot import run_bot
 import argparse
-import sys
 
 parser=argparse.ArgumentParser(description='Run part of the file', prog='mosaic_bot')
 parser.add_argument('component',choices=['bot','server'])
