@@ -1,6 +1,7 @@
 import datetime
 from ctypes import c_int64, c_uint64
 from functools import lru_cache
+from typing import Optional
 
 import PIL.Image
 from sqlalchemy import Column, String, Integer, create_engine, DateTime, ForeignKey, or_
@@ -42,11 +43,13 @@ class UInt64(TypeDecorator):
 class Hash(TypeDecorator):
     impl = String
     
-    def process_bind_param(self, value: int, dialect) -> str:
-        return str(value)
+    def process_bind_param(self, value: Optional[int], dialect) -> Optional[str]:
+        if value is not None:
+            return str(value)
     
-    def process_result_value(self, value: str, dialect) -> int:
-        return int(value)
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[int]:
+        if value is not None:
+            return int(value)
 
 
 class User(Base):

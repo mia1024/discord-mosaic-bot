@@ -1,5 +1,5 @@
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
-from mosaic_bot.bot import client
+from mosaic_bot.bot import run_bot
 import argparse
 import sys
 
@@ -8,6 +8,6 @@ parser.add_argument('component',choices=['bot','server'])
 args=parser.parse_args()
 
 if args.component=='bot':
-    client.run(MOSAIC_BOT_TOKEN)
+    run_bot(MOSAIC_BOT_TOKEN)
 
 

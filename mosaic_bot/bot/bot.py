@@ -2,16 +2,19 @@ import asyncio
 import logging.handlers
 import os
 import random
+import sys
 import re
 import time
 from asyncio import sleep
 from dataclasses import dataclass
 from typing import List, Union
 
+import traceback
 import aiohttp
 import discord
 from PIL import Image
 from discord.ext import commands
+from hashlib import sha1
 
 from mosaic_bot import BASE_PATH, db, __version__
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
@@ -24,7 +27,7 @@ try:
     os.mkdir('/var/log/mosaic')
 except FileExistsError:
     pass
-
+formatter = logging.Formatter('[%(asctime)s]  %(levelname)-5s %(message)s')
 handler = logging.handlers.TimedRotatingFileHandler(
         filename='/var/log/mosaic/mosaic-bot.discord-gateway.log',
         when='D',
@@ -33,8 +36,7 @@ handler = logging.handlers.TimedRotatingFileHandler(
         encoding='utf8',
         delay=True,
 )
-handler.setFormatter(
-        logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
+handler.setFormatter(formatter)
 discord_logger = logging.getLogger('discord')
 discord_logger.setLevel(logging.DEBUG)
 discord_logger.addHandler(handler)
@@ -47,11 +49,13 @@ handler = logging.handlers.TimedRotatingFileHandler(
         encoding='utf8',
         delay=True,
 )
-handler.setFormatter(
-        logging.Formatter('[%(asctime)s]  %(levelname)-7s %(name)s: %(message)s'))
+handler.setFormatter(formatter)
 logger = logging.getLogger('mosaic-bot')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
+stream = logging.StreamHandler(sys.stdout)
+stream.setFormatter(formatter)
+logger.addHandler(stream)
 
 # ---------------- end logging --------------
 
@@ -82,6 +86,7 @@ async def get_webhook(channel_id: int) -> discord.Webhook:
             webhook = wh
             break
     else:
+        logger.info(f'No webhook for channel {channel.id} (#{channel.name}), creating')
         webhook = await channel.create_webhook(name=bot.user.name, avatar=ICON,
                                                reason='webhook is necessary for sending custom external emojis')
     return webhook
@@ -98,22 +103,24 @@ class MessageManager:
     active_managers = {}
     
     def __init__(self, ctx: commands.Context):
-        self.channel = ctx.channel.id
+        self.channel: int = ctx.channel.id
         self.destination = ctx
         self.message_ids: list[int] = []
         self.requesting_message: int = ctx.message.id
         self.requester: int = ctx.message.author.id
         self.active_managers[self.requesting_message] = self
         self.is_interrupted = False
-        self._queue = []
+        self._queue: list[tuple[tuple, dict]] = []
         self.rtt = []  # round trip time
         self.show_confirmation = False
         self.image_hash = None
     
     async def __aenter__(self):
         while self.channel in self.channel_locks:
+            logger.info('MessageManager: waiting for channel lock to release')
             await sleep(1.5)
         self.channel_locks.add(self.channel)
+        logger.info(f'Locking channel {self.channel} (#{self.destination.channel.name})')
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -132,7 +139,10 @@ class MessageManager:
             await self.send('Unexpected error while processing your request, please try again later. '
                             'If this error persists, please consider submitting a bug report in my '
                             'official server (<https://discord.gg/AQJac7JN8n>).')
+            logger.error('Error while processing command. Stacktrace:')
+            logger.error(traceback.format_exc())
         
+        logger.info(f'Releasing channel lock for {self.channel} (#{self.destination.channel.name})')
         self.channel_locks.remove(self.channel)
         
         del self.active_managers[self.requesting_message]
@@ -142,6 +152,7 @@ class MessageManager:
         if self.message_ids:
             db.request_completed(self.requester, self.image_hash, self.requesting_message, self.destination.channel.id,
                                  self.message_ids)
+            logger.info(f'Request completed. MessageManager exit')
     
     def queue(self, *args, use_webhook=False, **kwargs):
         self._queue.append((args, {"use_webhook": use_webhook, **kwargs}))
@@ -184,10 +195,12 @@ class MessageManager:
         )
     
     async def commit_queue(self):
+        logger.info(f'Committing message queue, queue size is {len(self._queue)}')
         if len(self._queue) < 5:
             # send messages faster as this will not trip the rate limit.
             # this shouldn't cause messages to deliver out of
             # order...i think
+            logger.debug('Using aggregated message sending method')
             self.show_confirmation = False
             fut = [self.send(f'From <@{self.requester}>:',
                              allowed_mentions=discord.AllowedMentions.none(),
@@ -198,8 +211,10 @@ class MessageManager:
             # this will send all messages at the same time
             # while not triggering __aexit__
             await asyncio.gather(*fut)
+            logger.debug('Completed. Deleting request message')
             await self.destination.message.delete()
         else:
+            logger.debug('Sending messages slowly')
             self.show_confirmation = True
             start = time.time()
             status = await self.destination.send(embed=self.get_embed(0, ''))
@@ -211,11 +226,13 @@ class MessageManager:
                 'use_webhook': self._queue[0][1]['use_webhook']}))
             
             if len(self._queue) > 30:
+                logger.debug('Queue is too long. Increasing delay')
                 delay = 1.5
             else:
                 delay = 1
             try:
                 for i, msg in enumerate(self._queue[:-1]):
+                    logger.debug(f'Sending message {i}/{len(self._queue)}')
                     start = time.time()
                     await self.send(*msg[0], **msg[1], trigger_typing=True)
                     
@@ -226,19 +243,22 @@ class MessageManager:
                             status.edit(embed=self.get_embed(i + 1, ''))
                     )
                     # don't use await since this can be executed while sleeping
-                    
+                    logger.debug(f'RTT is {round(rtt, 3)}s')
                     await sleep(delay - rtt)
                     # while discord.py handles all the rate limits
                     # it looks better to have a uniformed speed
                 
                 msg = self._queue[-1]
                 await self.send(*msg[0], **msg[1])
+                logger.debug('Completed. Deleting request message')
                 await self.destination.message.delete()
             finally:
+                logger.debug('Deleting status message')
                 await status.delete()
     
     async def send(self, *args, trigger_typing=False, use_webhook=False, **kwargs):
         if use_webhook:
+            logger.debug('Using webhook')
             wh = await get_webhook(self.channel)
             msg = await wh.send(*args, wait=True, **kwargs)
         else:
@@ -256,16 +276,18 @@ class MessageManager:
         return msg
     
     def interrupt(self):
+        logger.info('Request interrupted')
         self.is_interrupted = True
     
     @classmethod
     def message_deleted(cls, c_id: int, m_id: int):
         if m_id in cls.active_managers:
             cls.active_managers[m_id].interrupt()
-        try:
-            msgs = db.get_associated_messages(m_id)
-        except db.NoResultFound:
+        
+        msgs = db.get_associated_messages(m_id)
+        if not msgs:
             return
+        logger.info(f'Deleting messages associated to request {msgs[-1]}')
         
         # keep the record in db in case of someone uploading offensive things
         asyncio.ensure_future(
@@ -278,6 +300,7 @@ async def delete_messages(cid: int, msgs: List[int], bulk=True):
     # which makes it easier to just implement the API call myself
     if not msgs:
         return
+    logger.info(f'Deleting messages {msgs}')
     async with aiohttp.ClientSession() as session:
         if len(msgs) == 1:
             res = await session.delete(
@@ -286,6 +309,7 @@ async def delete_messages(cid: int, msgs: List[int], bulk=True):
                         'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                     },
             )
+            logger.info(f'Completed. Return code is {res.status}')
         elif bulk:
             res = await session.post(
                     f'https://discord.com/api/v8/channels/{cid}/messages/bulk-delete',
@@ -303,15 +327,20 @@ async def delete_messages(cid: int, msgs: List[int], bulk=True):
                 # try again using the other end point
                 # because MANAGE_MESSAGES permission
                 # may not present
+            else:
+                logger.info(f'Bulk deletion completed')
         else:
             random.shuffle(msgs)
+            logger.info(f'Using random messages deletion')
             for mid in msgs:
-                await session.delete(
+                logger.info(f'Deleting {mid}')
+                res = await session.delete(
                         f'https://discord.com/api/v8/channels/{cid}/messages/{mid}',
                         headers={
                             'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                         },
                 )
+                logger.info(f'Server returned {res.status}')
                 await sleep(1.5)
 
 
@@ -353,9 +382,14 @@ def parse_opt(s: str):
         opts.large = 'large' in args
         opts.with_space = 'with space' in args
         opts.multiline = 'multiline' in args or 'irc' in args
-    print(l)
-    print(opts)
     return opts
+
+
+def log_command_enter(ctx: commands.Context, command_name: str, args: str):
+    logger.info(f'Processing request from {ctx.author.id} '
+                f'({ctx.author.name}#{ctx.author.discriminator}).'
+                f'Target command: {command_name}')
+    logger.info(f'Args: "{args}"')
 
 
 @bot.command()
@@ -363,6 +397,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
     async with MessageManager(ctx) as manager:
         if isinstance(raw_or_parsed_args, str):
             raw_args = raw_or_parsed_args.lower().strip()
+            log_command_enter(ctx, 'show', raw_args)
             if not raw_args:
                 return
             
@@ -376,11 +411,13 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
         
         try:
             try:
-                h = int(opts.name)
+                h = int(opts.name, 0)
             except ValueError:
                 h = db.get_image_hash(opts.name)
             path = db.get_image_path(h)
+            logger.info(f'Hash look up succeeded. Image file path is {path}')
         except db.NoResultFound:
+            logger.info(f'Hash not found, aborting')
             await manager.send(f"Huh, I've never seen an image of `{opts.name}`. I wonder what it looks like")
             return
         manager.image_hash = h
@@ -388,11 +425,13 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
         if opts.large and img.width > 27:
             # discord displays all lines above 27 emojis as inline, according
             # to trial and error.
+            logger.info(f'Image size check for large image failed. Width is {img.width}, aborting')
             await manager.send(
                     f"Umm it seems that an image of `{opts.name}`is {img.width - 27} pixels too wide to be sent as large")
             return
         
         if img.width > 79:
+            logger.info(f'Image size check failed. Width is {img.width}, aborting')
             await manager.send(
                     f"Well, it seems like an image of `{opts.name}` is {img.width - 79} pixels too wide to be sent. "
                     r"Nice job on whoever managed to upload this I guess ¯\_(ツ)_/¯")
@@ -408,6 +447,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 messages = split_minimal(emojis)
         
         except EmojiSequenceTooLong:
+            logger.info(f'Message size check failed, aborting')
             await manager.send(
                     f"Well, it seems like an image of `{opts.name}` produced a really long message. "
                     r"Nice job on whoever managed to upload this I guess ¯\_(ツ)_/¯")
@@ -421,14 +461,17 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
 @bot.command()
 async def gradient(ctx: commands.Context, *, raw_args=''):
     async with MessageManager(ctx) as manager:
+        log_command_enter(ctx, 'gradient', raw_args)
         opts = parse_opt(raw_args)
         c = re.search(r'\b(?P<c>[rgb]|red|green|blue)=(?P<v>\d{1,2})\b', raw_args)
         if c is None:
             await manager.send("You need to specify a base color because, "
                                "unfortunately, you humans can't see a message in 3D if I send one")
+            logger.info('Invalid gradient color, aborting')
             return
         if not 0 <= int(c.group('v')) <= 15:
             await manager.send("You see, I only know 16 colors so I can't do that")
+            logger.info('Invalid gradient range, aborting')
             return
         color = {c.group('c')[0]: int(c.group('v'))}
         img = gen_gradient(**color)
@@ -447,28 +490,32 @@ async def gradient(ctx: commands.Context, *, raw_args=''):
 @bot.command()
 async def delete(ctx: commands.Context, *, raw_args=''):
     async with MessageManager(ctx) as mm:
+        log_command_enter(ctx, 'delete', raw_args)
         try:
-            id = int(raw_args.strip())
+            message_id = int(raw_args.strip())
         except ValueError:
             try:
                 m = re.search(r'https://discord.com/channels/\d+/\d+/(\d+)', raw_args)
-                id = int(m.group(1))
+                message_id = int(m.group(1))
             except:
+                logger.info('Invalid target message id, aborting')
                 await mm.send("Ugh, you sure this is a valid message id or a link to the message?")
                 return
         
         try:
-            req = db.get_request(id)
+            req = db.get_request(message_id)
         except db.NoResultFound:
-            await mm.send(f"Hmm, I've never seen a message with an id of {id}. "
+            logger.info('Cannot find associated request for target message, aborting')
+            await mm.send(f"Hmm, I've never seen a message with an id of {message_id}. "
                           f"I wonder what's inside that makes you want to delete it so badly")
             return
         
         if ctx.author.id != req.requester:
+            logger.info('Requester check failed, aborting')
             await mm.send(f"What? Are you asking me to delete something not belonging to you? Well, you tried")
             return
         
-        msgs = db.get_associated_messages(id)
+        msgs = db.get_associated_messages(message_id)
         if req.channel == ctx.channel.id:
             msgs.append(ctx.message.id)
         else:
@@ -483,10 +530,27 @@ async def on_raw_message_delete(e: discord.RawMessageDeleteEvent):
 
 @bot.event
 async def on_connect():
-    print('Connected to Discord gateway')
+    logger.info('Connected to Discord gateway')
 
 
 @bot.event
 async def on_ready():
-    print('Logged in as ' + bot.user.name + '#' + bot.user.discriminator)
+    logger.info('Logged in as ' + bot.user.name + '#' + bot.user.discriminator)
     await bot.change_presence(activity=discord.Activity(name='|show help', type=discord.ActivityType.playing))
+
+
+@bot.event
+async def on_disconnect():
+    logger.info('Disconnected from Discord gateway')
+
+
+def run_bot(token, *args, **kwargs):
+    hasher = sha1()
+    source = open(__file__, 'rb')
+    hasher.update(source.read())
+    source.close()
+    logger.info(f'Starting mosaic bot {__version__}, build {hasher.hexdigest()}')
+    bot.run(token, *args, **kwargs)
+
+
+__all__ = ['run_bot']
