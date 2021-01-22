@@ -1,3 +1,3 @@
-from .bot import bot as client
+from .bot import run_bot
 
-__all__=['client']
+__all__=['run_bot']
