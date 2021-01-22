@@ -1,14 +1,14 @@
 import pathlib
 import PIL.Image
-from hashlib import sha1
+from hashlib import md5
 import os
 
 BASE_PATH = pathlib.Path(__file__).resolve().parent.parent
-IMAGE_DIR = './new_images/'
+IMAGE_DIR = 'new_images/'
 __version__ = '0.1'
 # versions will be numbered after the golden ratio, like how LaTeX does it
 
-hasher = sha1()
+hasher = md5()
 for root, dir, files in os.walk(BASE_PATH / 'mosaic_bot'):
     for fp in files:
         if fp.endswith('.py'):

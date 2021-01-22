@@ -100,23 +100,29 @@ Response.metadata.create_all(engine)
 
 
 def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 10) -> None:
-    session = Session()
+    s = Session()
     hash = hash_image(img)
     
-    all_images = session.query(Image).all()
+    all_images = s.query(Image).all()
     for img in all_images:
         if (d := diff_hash(img.hash, hash)) < min_allowed_diff:
             raise ImageExists(f'Hash of {name} is in conflict with {img.name}: {img.hash}. Diff is {d}.')
-    session.add(Image(name=name, hash=hash))
-    session.commit()
+    s.add(Image(name=name, hash=hash))
+    s.commit()
+
+
+def response_deleted(request: int):
+    s = Session()
+    s.query(Response).filter(Response.requesting_message == request).delete()
+    s.commit()
 
 
 @lru_cache(100)
 def get_image_path(hash: int) -> str:
-    session = Session()
+    s = Session()
     
     # this will raise an exception if hash doesn't exist
-    session.query(Image.hash).filter(Image.hash == hash).one()
+    s.query(Image.hash).filter(Image.hash == hash).one()
     
     return compute_image_path_from_hash(hash)
 
@@ -144,7 +150,11 @@ def request_completed(by: int, hash: int, message_id: int, channel_id: int, resp
 
 def get_request(msg: int) -> Request:
     """
-    given a message id, returns the request for that message, if any
+    given a message id, returns the associated request, if any
+    
+    :param msg: the message id
+    :return: the request
+    :raises: NoResultFound
     """
     s = Session()
     
@@ -152,16 +162,24 @@ def get_request(msg: int) -> Request:
     return s.query(Request).filter(or_(Request.requesting_message == req, Request.requesting_message == msg)).one()
 
 
-def get_associated_messages(msg: int):
+def get_associated_messages(msg: int, is_request: bool):
     """
-    given a response message id, returns all the response message ids and
+    given a message id, returns all the response message ids and
     the requesting message id. used to delete all associated messages.
+    
+    :param msg: the request or response message id
+    :param is_request: whether msg can be a request id
+    :return: the list of message ids. the first item is always the request
     """
     s = Session()
-    
-    req = s.query(Response.requesting_message).filter(Response.response == msg)
+    if is_request:
+        req = s.query(Response.requesting_message).filter(or_(Response.response == msg, Response.requesting_message == msg))
+    else:
+        req = s.query(Response.requesting_message).filter(Response.response == msg)
     res = s.query(Response.response).filter(Response.requesting_message == req)
-    return list(map(lambda row: row[0], res.union(req).all()))
+    
+    # because request message always comes first, its id is always smaller
+    return list(map(lambda row: row[0], res.union(req).order_by(Response.response).all()))
 
 
 __all__ = [
