@@ -1,3 +1,7 @@
+# Status
+
+This project is currently a work in progress. As such, there is no public way for anyone to try the bot out. If you would like to join the alpha test server, please contact me. The beta phase will begin soon. 
+
 # Mosaic Bot
 
 Getting tired of wanting to demonstrate power but only being able to send small images on Discord, 
