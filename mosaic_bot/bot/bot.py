@@ -26,7 +26,7 @@ try:
     os.mkdir('/var/log/mosaic')
 except FileExistsError:
     pass
-formatter = logging.Formatter('[%(asctime)s] %(levelname)-7s %(message)s')
+formatter = logging.Formatter('[%(asctime)s.%(msecs)03d] %(levelname)-7s %(message)s','%m-%d %H:%M:%S')
 handler = logging.handlers.TimedRotatingFileHandler(
         filename='/var/log/mosaic/mosaic-bot.discord-gateway.log',
         when='D',
@@ -50,7 +50,7 @@ handler = logging.handlers.TimedRotatingFileHandler(
 )
 handler.setFormatter(formatter)
 logger = logging.getLogger('mosaic-bot')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 stream = logging.StreamHandler(sys.stdout)
 stream.setFormatter(formatter)
@@ -103,16 +103,16 @@ class MessageLogger:
         self.id = id
     
     def debug(self, message, *args, **kwargs):
-        logger.debug(f'({self.id}) ' + message, *args, **kwargs)
+        logger.debug(f'({self.id}) {message}', *args, **kwargs)
     
     def info(self, message, *args, **kwargs):
-        logger.info(f'({self.id}) ' + message, *args, **kwargs)
+        logger.info(f'({self.id}) {message}', *args, **kwargs)
     
     def warning(self, message, *args, **kwargs):
-        logger.warning(f'({self.id}) ' + message, *args, **kwargs)
+        logger.warning(f'({self.id}) {message}', *args, **kwargs)
     
     def error(self, message, *args, **kwargs):
-        logger.error(f'({self.id}) ' + message, *args, **kwargs)
+        logger.error(f'({self.id}) {message}', *args, **kwargs)
 
 
 class MessageManager:
@@ -231,7 +231,7 @@ class MessageManager:
             # while not triggering __aexit__
             await asyncio.gather(*fut)
             self.logger.debug('Completed. Deleting request message')
-            await self.destination.message.delete()
+            asyncio.ensure_future(self.destination.message.delete())
         else:
             self.logger.debug('Sending messages slowly')
             self.show_confirmation = True
@@ -418,7 +418,7 @@ def parse_opt(s: str):
 
 
 def log_command_enter(logger: MessageLogger, ctx: commands.Context, command_name: str, args: str):
-    logger.info(f'Processing request {ctx.message.id} from {ctx.author.id} '
+    logger.info(f'Processing request from {ctx.author.id} '
                 f'({ctx.author.name}#{ctx.author.discriminator})')
     logger.info(f'Target command: {command_name}')
     logger.info(f'Args: "{args}"')

@@ -204,6 +204,7 @@ def find_scale(PIL_image: Image.Image, debug=False, prioritize_alignment=False) 
                 cv2.cvtColor(debug_data.labeled, cv2.COLOR_BGRA2RGBA)
         )
         return candidates[0].scale, debug_data
+    return candidates[0].scale
 
 
 __all__ = ['find_scale', 'DebugData']

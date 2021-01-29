@@ -11,7 +11,7 @@ from mosaic_bot.emojis import get_emoji_by_rgb
 
 def downsample(img: Image.Image, scale: int = None) -> Image.Image:
     if not scale:
-        scale = find_scale(img, debug=True)
+        scale = find_scale(img)
     return img.resize((img.size[0] // scale, img.size[1] // scale), Image.NEAREST)
 
 
