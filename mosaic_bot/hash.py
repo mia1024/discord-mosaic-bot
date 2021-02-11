@@ -1,7 +1,7 @@
 from mosaic_bot import IMAGE_DIR
 from PIL import Image
 import numpy as np
-from scipy import fft
+import cv2
 
 b64_alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'
 reverse_b64_alphabet = {
@@ -38,7 +38,7 @@ def decode_hash(encoded_hash: str) -> int:
 
 
 def compute_image_path_from_hash(hash: int) -> str:
-    return IMAGE_DIR + encode_hash(hash) + '.png'
+    return IMAGE_DIR / (encode_hash(hash) + '.png')
 
 
 def hash_image(img: Image.Image) -> int:
@@ -51,10 +51,10 @@ def hash_image(img: Image.Image) -> int:
     
     img = img.convert('L')
     arr = np.asarray(img)
-    freq = fft.dct(
-            fft.dct(arr, axis=0, norm='ortho'),
-            axis=1, norm='ortho'
-    )[:12, :12]
+    w,h=arr.shape
+    z = np.zeros((w+1 if w%2 else w,h+1 if h%2 else h),np.float64)
+    z[:w,:h]=arr
+    freq = cv2.dct(z)[:12, :12]
     return int.from_bytes(np.packbits(freq > np.average(freq[1:,1:])), 'big')
 
 

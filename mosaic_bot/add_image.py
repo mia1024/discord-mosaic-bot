@@ -6,20 +6,20 @@ import shutil
 from mosaic_bot.hash import hash_image
 
 conflicts = []
-if os.path.exists(BASE_PATH/'new_images'):
-    shutil.rmtree(BASE_PATH / 'new_images')
-os.mkdir(BASE_PATH / 'new_images')
-for file in os.listdir(BASE_PATH / 'images'):
+if os.path.exists(BASE_PATH/'images'):
+    shutil.rmtree(BASE_PATH / 'images')
+os.mkdir(BASE_PATH / 'images')
+for file in os.listdir(BASE_PATH / 'all_images'):
     if not file.endswith('.png'):
         continue
-    img = Image.open(BASE_PATH / 'images' / file)
+    img = Image.open(BASE_PATH / 'all_images' / file)
     try:
         db.add_image(img, file[:-4].replace('_', ' '), 1)
     except db.ImageExists as e:
         conflicts.append(e.args[0])
     else:
         name = db.get_image_path(hash_image(img))
-        shutil.copy(BASE_PATH / 'images' / file, BASE_PATH / name)
+        shutil.copy(BASE_PATH / 'all_images' / file, BASE_PATH / name)
 print('Conflicts: ')
 for c in conflicts:
     print(c)
