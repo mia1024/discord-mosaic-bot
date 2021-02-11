@@ -99,7 +99,7 @@ User.metadata.create_all(engine)
 Response.metadata.create_all(engine)
 
 
-def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 10) -> None:
+def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 6) -> None:
     s = Session()
     hash = hash_image(img)
     

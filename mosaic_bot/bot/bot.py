@@ -23,12 +23,12 @@ from mosaic_bot.image import gen_emoji_sequence, gen_gradient
 # ---------------- logging ----------------
 
 try:
-    os.mkdir('/var/log/mosaic')
+    os.mkdir(BASE_PATH/'log')
 except FileExistsError:
     pass
 formatter = logging.Formatter('[%(asctime)s.%(msecs)03d] %(levelname)-7s %(message)s','%m-%d %H:%M:%S')
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename='/var/log/mosaic/mosaic-bot.discord-gateway.log',
+        filename=BASE_PATH/'log'/'mosaic-bot.discord-gateway.log',
         when='D',
         interval=7,
         backupCount=100,
@@ -41,7 +41,7 @@ discord_logger.setLevel(logging.DEBUG)
 discord_logger.addHandler(handler)
 
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename='/var/log/mosaic/mosaic-bot.log',
+        filename=BASE_PATH/'log'/'mosaic-bot.log',
         when='D',
         interval=7,
         backupCount=100,
