@@ -1,5 +1,6 @@
 FROM python:3.9-alpine AS deps
 WORKDIR /
+
 RUN apk update && apk add --no-cache build-base cmake libffi-dev openjpeg-dev libjpeg-turbo-dev libpng-dev libwebp-dev openblas-dev tiff-dev unzip curl openjpeg
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -17,13 +18,16 @@ WORKDIR build
 RUN cmake -DBUILD_LIST=imgproc,core,python3 -DPYTHON3_EXECUTABLE=/mosaic_bot/env/bin/python -DWITH_CSTRIPES=ON -DCMAKE_INSTALL_PREFIX=/cv-dist /opencv-3.4.13/ 
 RUN make -j$(nproc)
 RUN make install -j$(nproc)
-RUN rm -r /cv-dist/include/
+RUN rm -r /cv-dist/include/ /cv-dist/share/
 RUN cp -r /cv-dist/ /mosaic_bot/env/
 
 WORKDIR /source
 RUN mkdir source
-COPY ./mosaic_bot /source/mosaic_bot
-COPY ./setup.py /source
+COPY . /source/
+
+ARG MOSAIC_BUILD_HASH
+ENV MOSAIC_BUILD_HASH=$MOSAIC_BUILD_HASH
+RUN python build_docker.py
 RUN /mosaic_bot/env/bin/python -m pip install /source --compile 
 
 WORKDIR /mosaic_bot

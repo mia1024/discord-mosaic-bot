@@ -1,0 +1,8 @@
+FROM python:3.9
+WORKDIR /root/
+RUN apt-get update -y && apt-get install -y freeglut3-dev libgtk2.0-dev
+RUN pip install scipy discord aiohttp aiodns opencv-python pillow requests sqlalchemy flask numpy gunicorn cchardet
+ENV MOSAIC_USE_DEV_TOKEN=1
+COPY . .
+RUN pip install -e .
+CMD python -m mosaic_bot bot
