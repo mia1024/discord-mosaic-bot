@@ -15,7 +15,7 @@ import discord
 from PIL import Image
 from discord.ext import commands
 
-from mosaic_bot import BASE_PATH, db, __version__, __build__
+from mosaic_bot import BASE_PATH, db, __version__, __build_type__, __build_hash__, __build_time__
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.emojis import get_emoji_by_rgb
 from mosaic_bot.image import gen_emoji_sequence, gen_gradient
@@ -61,17 +61,17 @@ logger.addHandler(stream)
 bot = commands.Bot('|', None, max_messages=None, intents=discord.Intents(messages=True))
 
 HELP_TEXT = f"""
-This is mosaic bot v{__version__}, build `{__build__}`.
-
 For descriptions of available commands, please visit https://mosaic.by.jerie.wang/references.
 
 Available commands:
 ```
-|show image_name [:[large], [with space, [multiline|irc]]]
+|show image_name [:[large], [with space], [multiline|irc]]
 |delete (message_id|message_link)
 |gradient (r|g|b|red|green|blue)=value
 ```
 """
+
+VERSION_TEXT = f'Mosaic bot v{__version__}, {__build_type__} build `{__build_hash__[:8]}` at {__build_time__}'
 
 ICON = (f := open(BASE_PATH / 'icon.png', 'br')).read()
 f.close()
@@ -436,7 +436,11 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             if raw_args == 'help':
                 await manager.send(HELP_TEXT)
                 return
-            
+
+            if raw_args == 'version':
+                await manager.send(VERSION_TEXT)
+                return
+
             opts = parse_opt(raw_args)
         else:
             opts = raw_or_parsed_args
@@ -626,7 +630,7 @@ async def on_error(e, *args, **kwargs):
 
 
 def run_bot(token, *args, **kwargs):
-    logger.info(f'Starting mosaic bot v{__version__}, build {__build__}')
+    logger.info(f'Starting Mosaic bot v{__version__}, {__build_type__} build {__build_hash__} at {__build_time__}')
     bot.run(token, *args, **kwargs)
 
 

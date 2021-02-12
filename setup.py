@@ -24,5 +24,5 @@ setuptools.setup(
             'gunicorn',
             'flask'
         ],
-        packages = ['mosaic_bot','mosaic_bot.bot']
+        packages = ['mosaic_bot','mosaic_bot.bot'],
 )

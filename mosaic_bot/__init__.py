@@ -1,5 +1,4 @@
 import pathlib
-from hashlib import md5
 import os
 try:
     import PIL.Image
@@ -17,18 +16,14 @@ IMAGE_DIR = BASE_PATH/'images'
 __version__ = '0.1'
 # versions will be numbered after the golden ratio, like how LaTeX does it
 
-hasher = md5()
-for root, dir, files in os.walk(pathlib.Path(__file__).resolve().parent):
-    for fp in files:
-        if fp.endswith('.py'):
-            with open(BASE_PATH / root / fp, 'rb') as f:
-                hasher.update(f.read())
-
-__build__ = hasher.hexdigest()
+from .__build__ import (build_hash as __build_hash__,
+                        build_type as __build_type__,
+                        build_time as __build_time__)
 
 __all__ = [
     '__version__',
-    '__build__',
+    '__build_hash__',
+    '__build_type__',
     'BASE_PATH',
     'IMAGE_DIR',
 ]
