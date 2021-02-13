@@ -1,0 +1,6 @@
+#!/bin/bash
+SHORT_HASH="$DOCKER_REPO:$($SOURCE_COMMIT|cut -c-7)"
+docker build -t "$DOCKER_REPO:lastest" -t "$DOCKER_REPO:$SHORT_HASH" \
+--build-arg MOSAIC_BUILD_HASH=$SOURCE_COMMIT .
+docker push "$DOCKER_REPO:lastest"
+docker push "$DOCKER_REPO:$SHORT_HASH"
