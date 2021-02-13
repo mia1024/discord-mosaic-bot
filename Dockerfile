@@ -40,7 +40,7 @@ FROM python:3.9-alpine
 RUN apk update && apk add --no-cache libffi openjpeg libjpeg-turbo libpng libwebp openblas tiff libstdc++
 COPY --from=deps --chown=666:666 /mosaic_bot /bot
 COPY --from=deps /cv-dist /bot/env/
-USER 666:666
+USER 1000:1000
 WORKDIR /bot
 ENV DATA_PATH=/bot/data
 ENV LD_LIBRARY_PATH=/bot/env/lib64
