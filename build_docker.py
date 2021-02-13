@@ -13,7 +13,7 @@ if not in_docker:
     args.extend(sys.argv[1:])
     os.execvp('docker',args)
 else:
-    hash=os.environ.get('MOSAIC_BUILD_HASH') or os.environ.get('SOURCE_COMMIT')
+    hash=os.environ.get('MOSAIC_BUILD_HASH')
     if not hash:
         print("ERROR: build arg MOSAIC_BUILD_HASH is not supplied",file=sys.stderr)
         exit(1)
