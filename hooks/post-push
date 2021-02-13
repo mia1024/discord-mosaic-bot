@@ -1,0 +1,4 @@
+#!/bin/bash
+tag="$DOCKER_REPO:$(echo $SOURCE_COMMIT|cut -c-7)"
+docker tag $IMAGE_NAME $tag
+docker push $tag
