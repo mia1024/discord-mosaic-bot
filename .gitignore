@@ -142,6 +142,7 @@ dmypy.json
 cython_debug/
 credentials.py
 images/
+data/
 test_images/
 new_images/
 all_images/

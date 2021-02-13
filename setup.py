@@ -25,4 +25,5 @@ setuptools.setup(
             'flask'
         ],
         packages = ['mosaic_bot','mosaic_bot.bot'],
+        zip_safe = False
 )

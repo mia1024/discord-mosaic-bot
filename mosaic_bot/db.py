@@ -10,13 +10,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.types import TypeDecorator
 
-from mosaic_bot import BASE_PATH
+from mosaic_bot import DATA_PATH
 from mosaic_bot.hash import compute_image_path_from_hash, diff_hash
 from mosaic_bot.hash import hash_image
 
 Base = declarative_base()
 
-engine = create_engine('sqlite:///' + str(BASE_PATH / 'db.sqlite3'), echo=False)
+engine = create_engine('sqlite:///' + str(DATA_PATH / 'db.sqlite3'), echo=False)
 Session = sessionmaker(bind=engine)
 
 
