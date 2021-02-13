@@ -21,16 +21,17 @@ RUN make install -j$(nproc)
 RUN rm -r /cv-dist/include/ /cv-dist/share/
 RUN cp -r /cv-dist/ /mosaic_bot/env/
 # install some major dependencies that will definitely show up here so they can be cached
-RUN /mosaic_bot/env/bin/python -m pip install discord aiohttp cchardet requests pillow
+RUN /mosaic_bot/env/bin/python -m pip install discord aiohttp cchardet requests pillow flask sqlalchemy
 
-WORKDIR /source
 RUN mkdir source
+WORKDIR /source
 COPY . /source/
 
 ARG MOSAIC_BUILD_HASH
 ENV MOSAIC_BUILD_HASH=$MOSAIC_BUILD_HASH
 RUN python build_docker.py
 RUN /mosaic_bot/env/bin/python -m pip install /source --compile 
+RUN ln -s /bot/credentials.py "/mosaic_bot/env/lib/python3.9/site-packages/mosaic_bot/credentials.py"
 
 WORKDIR /mosaic_bot
 RUN mkdir data
