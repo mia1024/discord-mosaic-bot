@@ -20,6 +20,8 @@ RUN make -j$(nproc)
 RUN make install -j$(nproc)
 RUN rm -r /cv-dist/include/ /cv-dist/share/
 RUN cp -r /cv-dist/ /mosaic_bot/env/
+# install some major dependencies that will definitely show up here so they can be cached
+RUN /mosaic_bot/env/bin/python -m pip install discord aiohttp cchardet requests pillow
 
 WORKDIR /source
 RUN mkdir source
@@ -32,9 +34,6 @@ RUN /mosaic_bot/env/bin/python -m pip install /source --compile
 
 WORKDIR /mosaic_bot
 RUN mkdir data
-COPY ./images/ data/images/
-COPY ./db.sqlite3 data
-COPY ./icon.png data
 
 FROM python:3.9-alpine
 RUN apk update && apk add --no-cache libffi openjpeg libjpeg-turbo libpng libwebp openblas tiff libstdc++
@@ -42,7 +41,6 @@ COPY --from=deps --chown=666:666 /mosaic_bot /bot
 COPY --from=deps /cv-dist /bot/env/
 USER 666:666
 WORKDIR /bot
-ENV BASE_PATH=/bot/data
+ENV DATA_PATH=/bot/data
 ENV LD_LIBRARY_PATH=/bot/env/lib64
-VOLUME /bot/data
 CMD /bot/env/bin/python -m mosaic_bot bot

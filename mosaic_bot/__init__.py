@@ -8,11 +8,11 @@ except ImportError:
     # that none of the deps are installed yet
     pass
 
-if p:=os.environ.get('BASE_PATH'):
-    BASE_PATH=pathlib.Path(p).resolve()
+if p:=os.environ.get('DATA_PATH'):
+    DATA_PATH=pathlib.Path(p).resolve()
 else:
-    BASE_PATH=pathlib.Path(__file__).resolve().parent.parent
-IMAGE_DIR = BASE_PATH/'images'
+    DATA_PATH=pathlib.Path(__file__).resolve().parent.parent/'data'
+IMAGE_DIR = DATA_PATH / 'images'
 __version__ = '0.1'
 # versions will be numbered after the golden ratio, like how LaTeX does it
 
@@ -24,6 +24,6 @@ __all__ = [
     '__version__',
     '__build_hash__',
     '__build_type__',
-    'BASE_PATH',
+    'DATA_PATH',
     'IMAGE_DIR',
 ]

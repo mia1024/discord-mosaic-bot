@@ -15,7 +15,7 @@ import discord
 from PIL import Image
 from discord.ext import commands
 
-from mosaic_bot import BASE_PATH, db, __version__, __build_type__, __build_hash__, __build_time__
+from mosaic_bot import DATA_PATH, db, __version__, __build_type__, __build_hash__, __build_time__
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.emojis import get_emoji_by_rgb
 from mosaic_bot.image import gen_emoji_sequence, gen_gradient
@@ -23,12 +23,12 @@ from mosaic_bot.image import gen_emoji_sequence, gen_gradient
 # ---------------- logging ----------------
 
 try:
-    os.mkdir(BASE_PATH/'log')
+    os.mkdir(DATA_PATH / 'log')
 except FileExistsError:
     pass
 formatter = logging.Formatter('[%(asctime)s.%(msecs)03d] %(levelname)-7s %(message)s','%m-%d %H:%M:%S')
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename=BASE_PATH/'log'/'mosaic-bot.discord-gateway.log',
+        filename= DATA_PATH / 'log' / 'mosaic-bot.discord-gateway.log',
         when='D',
         interval=7,
         backupCount=100,
@@ -41,7 +41,7 @@ discord_logger.setLevel(logging.DEBUG)
 discord_logger.addHandler(handler)
 
 handler = logging.handlers.TimedRotatingFileHandler(
-        filename=BASE_PATH/'log'/'mosaic-bot.log',
+        filename= DATA_PATH / 'log' / 'mosaic-bot.log',
         when='D',
         interval=7,
         backupCount=100,
@@ -73,7 +73,7 @@ Available commands:
 
 VERSION_TEXT = f'Mosaic bot v{__version__}, {__build_type__} build `{__build_hash__[:8]}` at {__build_time__}'
 
-ICON = (f := open(BASE_PATH / 'icon.png', 'br')).read()
+ICON = (f := open(DATA_PATH / 'icon.png', 'br')).read()
 f.close()
 
 
@@ -457,7 +457,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             await manager.send(f"Huh, I've never seen an image of `{opts.name}`. I wonder what it looks like")
             return
         manager.image_hash = h
-        img = Image.open(BASE_PATH / path)
+        img = Image.open(DATA_PATH / path)
         if opts.large and img.width > 27:
             # discord displays all lines above 27 emojis as inline, according
             # to trial and error.

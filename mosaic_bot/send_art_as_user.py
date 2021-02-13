@@ -4,13 +4,13 @@ from mosaic_bot.cv import find_scale
 from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 import requests
 from mosaic_bot.emojis import get_emoji_by_rgb
-from mosaic_bot import BASE_PATH
+from mosaic_bot import DATA_PATH
 
 API_ENDPOINT = 'https://discord.com/api/v8'
 
 name = input('Image filename? ')
 
-img = Image.open(BASE_PATH / 'images' / name)
+img = Image.open(DATA_PATH / 'images' / name)
 scale = find_scale(img)
 print(f'Downsampling at {scale}x')
 img = downsample(img.crop(img.getbbox()), find_scale(img))

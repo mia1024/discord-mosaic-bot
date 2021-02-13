@@ -1,0 +1,11 @@
+data/
+screenshots/
+docs/
+*/credentials*
+credentials*
+*images/
+emojis/
+log/
+.ipynb_checkpoints/
+*.egg-info/
+.idea/
