@@ -129,6 +129,15 @@ def gen_gradient(r: int = None, g: int = None, b: int = None, x='+', y='+'):
             img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))
     return img
 
+def gen_pride_flag(*colors:tuple):
+    height=len(colors)
+    width=round(height*16/9)
+    img=Image.new('RGBA',(width,height))
+    for y,color in enumerate(colors):
+        for x in range(width):
+            img.putpixel((x,y),color)
+    return img
+
 
 __all__ = [
     'gen_image_preview',
