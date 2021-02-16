@@ -1,6 +1,9 @@
-# Status
+# Status of this repository
+This repository contains the source code of the Discord bot Mosaic (`mosaic#1013`, bot user ID `771643297088667648`).
 
 This project is currently a work in progress. As such, there is no public way for anyone to try the bot out. If you would like to join the alpha test server, please contact me. The beta phase will begin soon. 
+
+The source code is provided for educational purpose only. In each release, instructions will be provided on how to run the bot locally. While the instructions aim to be functional, no support will be provided in setting up your own instance of the bot. However, you may not deploy any Discord bot that utilizes any portion of this project's source code to more than 3 servers. 
 
 # Mosaic Bot
 
@@ -24,50 +27,4 @@ where things can be colorful
 
 To give a more direct comparison of the size differences: 
 ![all fireballs](screenshots/all_fireballs.png)
-
-If you happen to love light mode just like all your friends, you are covered!
-![light fireball](screenshots/light_fireball.png)
-
-Don't like spacing? Don't worry, the bot can try it's best to remove all the 
-spaces:
-![nospace fireball](screenshots/nospace_fireball.png)
-
-Of course, if the image in interest is larger than 8x8, multiple messages
-are still necessary due to Discord's 2000 characters limit. 
-
-But what if some of your friends love light mode, some despise it? An image
-looking like this is...a little bit weird
-![nospace fireball wrong color mode](screenshots/nospace_fireball_lightmode.png)
-
-In that case, you can instruct the bot to pad the image to a rectangle even in
-the less space mode: 
-![nospace fireball with padding](screenshots/nospace_fireball_with_padding.png)
-
-Admittedly, it still looks a little bit weird, but way less so.
-
-## Command Reference
-
-```
-|show help
-```
-Display a link to this page. 
-
-```
-|show $image_name 
-```
-Shows the name specified by `$image_name`. The following modifiers exist:
-
-- large: show an larger version of the image. Only applicable to images that are less than 28 pixels wide.
-- no space, nospace: removes the spaces between horizontal pixels and attempt to lump as many pixels together as possible
-- with padding: pads the image to a rectangle, only has effect if `no space` is specified and `large` is not specified
-- light: set the background to white
-
-The modifiers can exist in any location of the command. The first unrecognized token will be treated as the image name.
-After that, all unrecognized tokens are ignored. So, 
-```
-|show large light fireball
-``` 
-is functionally equivalent to 
-```
-|show fireball that is large, embraced by the lord of light, and with no space in between
 ```
