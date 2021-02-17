@@ -117,8 +117,9 @@ class MessageLogger:
 
 
 class MessageManager:
-    channel_locks = set()
+    channel_locks = {}
     active_managers = {}
+    channel_type_cache = {}
 
     def __init__(self, ctx: commands.Context):
         self.channel: int = ctx.channel.id
@@ -126,25 +127,51 @@ class MessageManager:
         self.message_ids: list[int] = []
         self.requesting_message: int = ctx.message.id
         self.requester: int = ctx.message.author.id
-        self.active_managers[self.requesting_message] = self
         self.is_interrupted = False
         self._queue: list[tuple[tuple, dict]] = []
         self.rtt = []  # round trip time
         self.show_confirmation = False
         self.image_hash = None
         self.logger = MessageLogger(self.requesting_message)
+        if self.channel in self.channel_type_cache:
+            self.channel_type = self.channel_type_cache[self.channel]
+            self.logger.info(f'Channel type found in cache: {self.channel_type}')
+        else:
+            # since any command that requires cleanup will take time to
+            # execute, it's safe to assume channel type to be 0...probably
+            self.channel_type = 0
+            self.logger.info(f'Channel type not found in cache. Retrieving in background')
+            asyncio.ensure_future(self.get_channel_type())
+
+        self.cleanup = self.channel_type == 0  # not DM
+
+    async def get_channel_type(self):
+        # apparently discord.py's caching just doesn't work and
+        # ctx doesn't contain the channel type
+        self.logger.info('Retrieving channel type from discord API')
+        async with aiohttp.ClientSession() as session:
+            resp = await session.get(f'https://discord.com/api/v8/channels/{self.channel}'
+                                     , headers = {'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN})
+            json = await resp.json()
+            self.channel_type = json['type']
+            self.logger.info(f'Channel type is {self.channel_type}')
+            self.channel_type_cache[self.channel] = self.channel_type
+            if self.channel_type != 0:
+                self.cleanup = False
 
     async def __aenter__(self):
         self.logger.debug(f'MessageManager enter')
         while self.channel in self.channel_locks:
             self.logger.info('MessageManager waiting for channel lock to release')
             await sleep(1.5)
-        self.channel_locks.add(self.channel)
+        self.logger.info(f'MessageManager active')
+        self.active_managers[self.requesting_message] = self
         self.logger.info(f'Locking channel {self.channel}')
+        self.channel_locks[self.channel] = self
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.show_confirmation:
+        if self.show_confirmation and self.cleanup:
             # a confirmation message used to toggle off the typing indicator,
             # if triggered
 
@@ -156,17 +183,24 @@ class MessageManager:
             await confirmation.delete(delay = 5)
 
         if exc_type and exc_type != RequestInterrupted:
-            await self.send('Unexpected error while processing your request, please try again later. '
+            await self.send('Unexpected error occurred while processing your request, please try again later. '
                             'If this error persists, please consider submitting a bug report in my '
-                            'official server (<https://discord.gg/AQJac7JN8n>).')
+                            f'official server (<https://discord.gg/AQJac7JN8n>) and provide this error id: `{self.requesting_message}`.')
             self.logger.error('Error while processing command')
+            self.logger.error(traceback.format_exc())
 
         self.logger.info(f'Releasing channel lock for {self.channel}')
-        self.channel_locks.remove(self.channel)
+        del self.channel_locks[self.channel]
 
         del self.active_managers[self.requesting_message]
         if exc_type == RequestInterrupted:
-            await delete_messages(self.channel, self.message_ids)
+            if self.cleanup:
+                await delete_messages(self.channel, self.message_ids)
+            else:
+                db.request_completed(self.requester, self.image_hash, self.requesting_message,
+                                     self.destination.channel.id,
+                                     self.message_ids)
+                self.logger.debug(f'Message ids {self.message_ids} added to database')
             return True
         if self.message_ids:
             db.request_completed(self.requester, self.image_hash, self.requesting_message, self.destination.channel.id,
@@ -193,7 +227,7 @@ class MessageManager:
 
         return discord.Embed.from_dict(
             {
-                'description': 'Delete the requesting message to interrupt',
+                'description': 'Delete the requesting message or send `|stop` to interrupt',
                 'fields'     : [
                     {
                         'name'  : 'ETA',
@@ -215,6 +249,7 @@ class MessageManager:
         )
 
     async def commit_queue(self):
+        await sleep(0) # return control back to the event loop for any pending tasks
         self.logger.info(f'Committing message queue, queue size is {len(self._queue)}')
         if len(self._queue) < 5:
             # send messages faster as this will not trip the rate limit.
@@ -222,7 +257,7 @@ class MessageManager:
             # order...i think
             self.logger.debug('Using aggregated message sending method')
             self.show_confirmation = False
-            fut = [self.send(f'From <@{self.requester}>:',
+            fut = [self.send(f'from <@{self.requester}>',
                              allowed_mentions = discord.AllowedMentions.none(),
                              use_webhook = self._queue[0][1]['use_webhook'])]
             for msg in self._queue:
@@ -231,13 +266,17 @@ class MessageManager:
             # this will send all messages at the same time
             # while not triggering __aexit__
             await asyncio.gather(*fut)
-            self.logger.debug('Completed. Deleting request message')
-            asyncio.ensure_future(self.destination.message.delete())
+            if self.cleanup:
+                self.logger.debug('Completed. Deleting request message')
+                asyncio.ensure_future(self.destination.message.delete())
+            else:
+                self.logger.debug('Completed. Request message not deleted')
         else:
             self.logger.debug('Sending messages slowly')
             self.show_confirmation = True
             start = time.time()
             status = await self.destination.send(embed = self.get_embed(0, ''))
+            self.logger.debug('Status message sent')
             self.rtt.append(time.time() - start)
             # apparently webhook shares the same rate limit???
 
@@ -262,6 +301,7 @@ class MessageManager:
                     asyncio.ensure_future(
                         status.edit(embed = self.get_embed(i + 1, ''))
                     )
+                    self.logger.debug(f'Status message update scheduled')
                     # don't use await since this can be executed while sleeping
                     self.logger.debug(f'RTT is {round(rtt, 3)}s')
                     await sleep(delay - rtt)
@@ -270,36 +310,41 @@ class MessageManager:
 
                 msg = self._queue[-1]
                 await self.send(*msg[0], **msg[1])
-                self.logger.debug('Completed. Deleting request message')
-                asyncio.ensure_future(
-                    self.destination.message.delete()
-                )
+                if self.cleanup:
+                    self.logger.debug('Completed. Deleting request message')
+                    asyncio.ensure_future(
+                        self.destination.message.delete()
+                    )
+                else:
+                    self.logger.debug('Completed. Request message not deleted')
             finally:
                 self.logger.debug('Deleting status message')
                 await status.delete()
 
     async def send(self, *args, trigger_typing = False, use_webhook = False, **kwargs):
+        if self.is_interrupted:
+            raise RequestInterrupted
         if use_webhook:
-            self.logger.debug('Sending message with webhook')
-            wh = await get_webhook(self.channel)
-            msg = await wh.send(*args, wait = True, **kwargs)
+            if self.channel_type==0:
+                self.logger.debug('Sending message with webhook')
+                wh = await get_webhook(self.channel)
+                msg = await wh.send(*args, wait = True, **kwargs)
+            else:
+                self.logger.debug('Refusing to send a webhook message in a DM channel')
+                return
         else:
             msg = await self.destination.send(*args, **kwargs)
         self.message_ids.append(msg.id)
-
-        if self.is_interrupted:
-            # raise exception after sending a message to toggle off the typing
-            # indicator. this exception will be caught by __aexit__() of this
-            # class
-            raise RequestInterrupted
 
         if trigger_typing:
             await self.destination.trigger_typing()
         return msg
 
-    def interrupt(self):
+    def interrupt(self, cleanup = True):
         self.logger.info('Request interrupted')
         self.is_interrupted = True
+        self.show_confirmation = False
+        self.cleanup = cleanup
 
     @classmethod
     async def message_deleted(cls, c_id: int, m_id: int):
@@ -320,6 +365,13 @@ class MessageManager:
         logger.info('(MESSAGE_DELETE) Associated messages deleted')
         db.response_deleted(msgs[0])
         logger.info('(MESSAGE_DELETE) Database response entries deleted')
+
+    @classmethod
+    def interrupt_channel(cls, id):
+        if id in cls.channel_locks:
+            cls.channel_locks[id].interrupt(cleanup = False)
+            return True
+        return False
 
 
 async def delete_messages(cid: int, msgs: List[int], bulk = True):
@@ -418,11 +470,11 @@ def parse_opt(s: str):
     return opts
 
 
-def log_command_enter(logger: MessageLogger, ctx: commands.Context, command_name: str, args: str):
-    logger.info(f'Processing request from {ctx.author.id} '
+def log_command_enter(logger, ctx: commands.Context, command_name: str, args: str,prefix=''):
+    logger.info(f'{prefix}Processing request from {ctx.author.id} '
                 f'({ctx.author.name}#{ctx.author.discriminator})')
-    logger.info(f'Target command: {command_name}')
-    logger.info(f'Args: "{args}"')
+    logger.info(f'{prefix}Target command: {command_name}')
+    logger.info(f'{prefix}Args: "{args}"')
 
 
 @bot.command()
@@ -455,7 +507,10 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
             manager.logger.info(f'Hash look up succeeded. Image file path is {path}')
         except db.NoResultFound:
             manager.logger.info(f'Hash not found, aborting')
-            await manager.send(f"Huh, I've never seen an image of `{opts.name}`. I wonder what it looks like")
+            if opts.name:
+                await manager.send(f"Huh, I've never seen an image of `{opts.name}`. I wonder what it looks like")
+            else:
+                await manager.send('huh??')  # triggered by |show :something
             return
         manager.image_hash = h
         img = Image.open(DATA_PATH / path)
@@ -607,7 +662,6 @@ async def delete(ctx: commands.Context, *, raw_args = ''):
 @bot.command()
 async def pride(ctx: commands.Context, *, raw_args = ''):
     async with MessageManager(ctx) as manager:
-        # color
         log_command_enter(manager.logger, ctx, 'pride', raw_args)
         opts = parse_opt(raw_args)
         if not opts.name:
@@ -616,17 +670,17 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
             img = gen_pride_flag((0, 0, 0), (163, 163, 163), (255, 255, 255), (128, 0, 128))
         elif opts.name in ('trans', 'transgender', 'trans-gender'):
             img = gen_pride_flag((91, 206, 250), (245, 169, 184), (255, 255, 255), (245, 169, 184), (91, 206, 250))
-        elif opts.name in ('rainbow', 'gay' ):
+        elif opts.name in ('rainbow', 'gay'):
             img = gen_pride_flag((255, 0, 24), (255, 165, 44), (255, 255, 65), (0, 128, 24), (0, 0, 249), (134, 0, 125))
         elif opts.name in ('bi', 'bisexual'):
             img = gen_pride_flag((214, 2, 112), (155, 79, 150), (0, 56, 168))
-        elif opts.name in ('pan','pan-sexual','pansexual'):
+        elif opts.name in ('pan', 'pan-sexual', 'pansexual'):
             img = gen_pride_flag((255, 33, 140), (255, 216, 0), (33, 177, 255))
-        elif opts.name in ('nonbinary','nb','non-binary'):
+        elif opts.name in ('nonbinary', 'nb', 'non-binary'):
             img = gen_pride_flag((255, 244, 48), (255, 255, 255), (156, 89, 209), (0, 0, 0))
-        elif opts.name in ('aro','aromantic'):
+        elif opts.name in ('aro', 'aromantic'):
             img = gen_pride_flag((61, 165, 66), (167, 211, 121), (255, 255, 255), (169, 169, 169), (0, 0, 0))
-        elif opts.name in ('lesbian','les'):
+        elif opts.name in ('lesbian', 'les'):
             img = gen_pride_flag((214, 41, 0), (255, 155, 85), (255, 255, 255), (212, 97, 166), (165, 0, 98))
         else:
             await manager.send(
@@ -636,14 +690,34 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
         emojis = gen_emoji_sequence(img, opts.large, opts.with_space)
         if opts.large or opts.multiline:
             messages = emojis.splitlines()
-            for m in messages:
-                if len(m) > 2000:
-                    raise EmojiSequenceTooLong
         else:
             messages = (emojis,)
         for m in messages:
             manager.queue(m)
         await manager.commit_queue()
+
+
+@bot.command()
+async def stop(ctx: commands.Context, *, raw_args = ''):
+    log_command_enter(logger, ctx, 'stop', raw_args, prefix = f'({ctx.message.id}) ')
+    if not raw_args:
+        if MessageManager.interrupt_channel(ctx.channel.id):
+            logger.info(f'({ctx.message.id}) Channel message queue interrupted')
+            if MessageManager.channel_type_cache.get(ctx.channel.id)==0:
+                # this cache probably exists if there's an ongoing manager...probably
+                await ctx.message.delete()
+            reply=f"<@{ctx.message.author.id}> I see that you don't like me"+random.choice(
+                ('<:zoomeyes:811418349472579644>','<:sadblob:811424330264346624>',
+                 '<a:ablobsadrain:811418657342488587>','😭','😢'))+" your reputation in my mind has officially been decreased by one "\
+                f"wait, it overflowed...well, now you have {2**32-1} reputation, whatever (wait, but I'm written in Python and can't have" \
+                                                                   f" an integer overflow, now I'm really confused...)"
+        else:
+            logger.info(f'({ctx.message.id}) No active manager in channel {ctx.channel.id}')
+            reply = "There's nothing I can stop, just like there's nothing you can do to stop me...well, almost nothing"
+    else:
+        reply = f'Why should I try to stop `{raw_args}`? The world is perfect as is'
+    async with MessageManager(ctx) as manager:
+        await manager.send(reply)
 
 
 @bot.event
@@ -676,9 +750,9 @@ async def on_error(e, *args, **kwargs):
     logger.error(traceback.format_exc())
 
 
-def run_bot(token, *args, **kwargs):
+def run_bot(*args, **kwargs):
     logger.info(f'Starting Mosaic bot v{__version__}, {__build_type__} build {__build_hash__} at {__build_time__}')
-    bot.run(token, *args, **kwargs)
+    bot.run(MOSAIC_BOT_TOKEN, *args, **kwargs)
 
 
 __all__ = ['run_bot']
