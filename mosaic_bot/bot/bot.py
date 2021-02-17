@@ -61,15 +61,29 @@ logger.addHandler(stream)
 bot = commands.Bot('|', None, max_messages = None, intents = discord.Intents(messages = True))
 
 HELP_TEXT = f"""
-For descriptions of available commands, please visit https://mosaic.by.jerie.wang/references.
+For detailed descriptions of available commands, please visit https://mosaic.by.jerie.wang/references.
 
-Available commands:
+Available commands (parentheses denote required arguments, square brackets denote optional):
 ```
-|show image_name [:[large], [with space], [multiline|irc]]
+|show image_name [img_opts]
+|gradient (r|g|b|red|green|blue)=value [x=(+|-)] [y=(+|-)] [img_opts]
+|pride [name_of_pride_flag] [img_opts]
 |delete (message_id|message_link)
-|gradient (r|g|b|red|green|blue)=value
-|pride [name_of_pride_flag]
+|stop
 ```
+`img_opts` is a comma-separated list beginning with a colon, followed by any or all of `with space, multiline, irc, large`, where `irc` is an alias of `multiline`
+
+Examples:
+```
+|show cat: large
+|show fireball: large, with space
+|show diamond
+|show minecraft painting creebet
+|gradient r=13 x=-
+|pride ace
+|delete 811485105436360744
+```
+Note that if you reply to a specific message, you don't have to provide an ID or link.
 """
 
 VERSION_TEXT = f'Mosaic bot v{__version__}, {__build_type__} build `{__build_hash__[:8]}` at {__build_time__}'
