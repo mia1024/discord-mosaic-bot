@@ -65,7 +65,10 @@ For detailed descriptions of available commands, please visit https://mosaic.by.
 
 Available commands (parentheses denote required arguments, square brackets denote optional):
 ```
-|show image_name [img_opts]
+|help
+|show help
+|show version
+|show (image_name|image_id) [img_opts]
 |gradient (r|g|b|red|green|blue)=value [x=(+|-)] [y=(+|-)] [img_opts]
 |pride [name_of_pride_flag] [img_opts]
 |delete (message_id|message_link)
@@ -79,7 +82,7 @@ Examples:
 |show fireball: large, with space
 |show diamond
 |show minecraft painting creebet
-|gradient r=13 x=-
+|gradient g=12 x=-
 |pride ace
 |delete 811485105436360744
 ```
@@ -110,6 +113,9 @@ class RequestInterrupted(Exception): pass
 
 
 class EmojiSequenceTooLong(Exception): pass
+
+
+class WebhookCreationError(Exception): pass
 
 
 class MessageLogger:
@@ -147,17 +153,6 @@ class MessageManager:
         self.show_confirmation = False
         self.image_hash = None
         self.logger = MessageLogger(self.requesting_message)
-        if self.channel in self.channel_type_cache:
-            self.channel_type = self.channel_type_cache[self.channel]
-            self.logger.info(f'Channel type found in cache: {self.channel_type}')
-        else:
-            # since any command that requires cleanup will take time to
-            # execute, it's safe to assume channel type to be 0...probably
-            self.channel_type = 0
-            self.logger.info(f'Channel type not found in cache. Retrieving in background')
-            asyncio.ensure_future(self.get_channel_type())
-
-        self.cleanup = self.channel_type == 0  # not DM
 
     async def get_channel_type(self):
         # apparently discord.py's caching just doesn't work and
@@ -175,6 +170,17 @@ class MessageManager:
 
     async def __aenter__(self):
         self.logger.debug(f'MessageManager enter')
+        if self.channel in self.channel_type_cache:
+            self.channel_type = self.channel_type_cache[self.channel]
+            self.logger.info(f'Channel type found in cache: {self.channel_type}')
+        else:
+            # since any command that requires cleanup will take time to
+            # execute, it's safe to assume channel type to be 0...probably
+            self.channel_type = 0
+            self.logger.info(f'Channel type not found in cache. Retrieving...')
+            await self.get_channel_type()
+
+        self.cleanup = self.channel_type == 0  # not DM
         while self.channel in self.channel_locks:
             self.logger.info('MessageManager waiting for channel lock to release')
             await sleep(1.5)
@@ -196,10 +202,11 @@ class MessageManager:
                 confirmation = await self.destination.send(f'<@{self.requester}> Request interrupted')
             await confirmation.delete(delay = 5)
 
-        if exc_type and exc_type != RequestInterrupted:
-            await self.send('Unexpected error occurred while processing your request, please try again later. '
-                            'If this error persists, please consider submitting a bug report in my '
-                            f'official server (<https://discord.gg/AQJac7JN8n>) and provide this error id: `{self.requesting_message}`.')
+        if exc_type and exc_type not in (RequestInterrupted, WebhookCreationError):
+            await self.send(
+                f'Unexpected error (`{exc_type.__name__}: {exc_val}`) occurred while processing your request, please try again later. '
+                'If this error persists, please consider submitting a bug report in my '
+                f'official server (<https://discord.gg/AQJac7JN8n>). Unique error ID: `{self.requesting_message}`.')
             self.logger.error('Error while processing command')
             self.logger.error(traceback.format_exc())
 
@@ -215,6 +222,12 @@ class MessageManager:
                                      self.destination.channel.id,
                                      self.message_ids)
                 self.logger.debug(f'Message ids {self.message_ids} added to database')
+            return True
+        elif exc_type == WebhookCreationError:
+            await self.send("Sorry, I can't do it here because I can't create a Webhook. "+(
+                "Please grant me `MANAGE_WEBHOOKS` first" if self.channel_type==0 else "Ya know, sometimes things just don't work in DM"
+            ))
+            self.logger.debug('Unable to create a webhook. Requester notified')
             return True
         if self.message_ids:
             db.request_completed(self.requester, self.image_hash, self.requesting_message, self.destination.channel.id,
@@ -263,7 +276,7 @@ class MessageManager:
         )
 
     async def commit_queue(self):
-        await sleep(0) # return control back to the event loop for any pending tasks
+        await sleep(0)  # return control back to the event loop for any pending tasks
         self.logger.info(f'Committing message queue, queue size is {len(self._queue)}')
         if len(self._queue) < 5:
             # send messages faster as this will not trip the rate limit.
@@ -276,7 +289,6 @@ class MessageManager:
                              use_webhook = self._queue[0][1]['use_webhook'])]
             for msg in self._queue:
                 fut.append(self.send(*msg[0], **msg[1]))
-
             # this will send all messages at the same time
             # while not triggering __aexit__
             await asyncio.gather(*fut)
@@ -339,13 +351,16 @@ class MessageManager:
         if self.is_interrupted:
             raise RequestInterrupted
         if use_webhook:
-            if self.channel_type==0:
+            if self.channel_type == 0:
                 self.logger.debug('Sending message with webhook')
-                wh = await get_webhook(self.channel)
+                try:
+                    wh = await get_webhook(self.channel)
+                except discord.Forbidden:
+                    raise WebhookCreationError
                 msg = await wh.send(*args, wait = True, **kwargs)
             else:
                 self.logger.debug('Refusing to send a webhook message in a DM channel')
-                return
+                raise WebhookCreationError
         else:
             msg = await self.destination.send(*args, **kwargs)
         self.message_ids.append(msg.id)
@@ -484,11 +499,18 @@ def parse_opt(s: str):
     return opts
 
 
-def log_command_enter(logger, ctx: commands.Context, command_name: str, args: str,prefix=''):
+def log_command_enter(logger, ctx: commands.Context, command_name: str, args: str, prefix = ''):
     logger.info(f'{prefix}Processing request from {ctx.author.id} '
                 f'({ctx.author.name}#{ctx.author.discriminator})')
     logger.info(f'{prefix}Target command: {command_name}')
     logger.info(f'{prefix}Args: "{args}"')
+
+
+@bot.command()
+async def help(ctx: commands.Context, *, raw_args: str):
+    with MessageManager(ctx) as manager:
+        log_command_enter(manager.logger, ctx, 'help', raw_args)
+        await manager.send(HELP_TEXT)
 
 
 @bot.command()
@@ -584,7 +606,12 @@ async def gradient(ctx: commands.Context, *, raw_args = ''):
                             await manager.send("You see, I only know 16 values in this color so I can't do that")
                             manager.logger.info('Invalid gradient range, aborting')
                             return
-                        gradient_opts[k] = v
+                        if k in ('r', 'red'):
+                            gradient_opts['r'] = v
+                        elif k in ('b', 'blue'):
+                            gradient_opts['b'] = v
+                        else:
+                            gradient_opts['g'] = v
                     else:
                         await manager.send("Hey, um, so you specified more than one "
                                            "color to remain the same. Surely you don't"
@@ -717,14 +744,15 @@ async def stop(ctx: commands.Context, *, raw_args = ''):
     if not raw_args:
         if MessageManager.interrupt_channel(ctx.channel.id):
             logger.info(f'({ctx.message.id}) Channel message queue interrupted')
-            if MessageManager.channel_type_cache.get(ctx.channel.id)==0:
+            if MessageManager.channel_type_cache.get(ctx.channel.id) == 0:
                 # this cache probably exists if there's an ongoing manager...probably
                 await ctx.message.delete()
-            reply=f"<@{ctx.message.author.id}> I see that you don't like me"+random.choice(
-                ('<:zoomeyes:811418349472579644>','<:sadblob:811424330264346624>',
-                 '<a:ablobsadrain:811418657342488587>','😭','😢'))+" your reputation in my mind has officially been decreased by one "\
-                f"wait, it overflowed...well, now you have {2**32-1} reputation, whatever (wait, but I'm written in Python and can't have" \
-                                                                   f" an integer overflow, now I'm really confused...)"
+            reply = f"<@{ctx.message.author.id}> I see that you don't like me" + random.choice(
+                ('<:zoomeyes:811418349472579644>', '<:sadblob:811424330264346624>',
+                 '<a:ablobsadrain:811418657342488587>', '😭',
+                 '😢')) + " your reputation in my mind has officially been decreased by one " \
+                          f"wait, it overflowed...well, now you have {2 ** 32 - 1} reputation, whatever (wait, but I'm written in Python and can't have" \
+                          f" an integer overflow, now I'm really confused...)"
         else:
             logger.info(f'({ctx.message.id}) No active manager in channel {ctx.channel.id}')
             reply = "There's nothing I can stop, just like there's nothing you can do to stop me...well, almost nothing"

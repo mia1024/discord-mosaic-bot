@@ -19,7 +19,7 @@ def crop(img: Image.Image) -> Image.Image:
     return img.crop(img.getbbox())
 
 
-def preprocess(img: Image.Image, debug: bool = False, scale=None):
+def preprocess(img: Image.Image, debug: bool = False, scale = None):
     if scale is None:
         if debug:
             scale, data = find_scale(img, True)
@@ -34,7 +34,7 @@ def preprocess(img: Image.Image, debug: bool = False, scale=None):
 
 # single line emojis will be rendered small >= 28
 
-def gen_emoji_sequence(img: Image.Image, large=False, with_space=False):
+def gen_emoji_sequence(img: Image.Image, large = False, with_space = False):
     # all images passed in should be preprocessed images
     # ie. RGBA, downsampled
     res = ''
@@ -85,36 +85,39 @@ def image_to_data(img: Image.Image, approx_12bit: bool):
 
 def gen_icon():
     img = Image.new("RGBA", (128, 128))
-    
+
     for x in range(128):
         for y in range(128):
             x_eff = x // 8
             y_eff = 15 - y // 8  # flip y-axis to math mode
-            
+
             r = x_eff
             g = 9
             b = y_eff
-            
+
             img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))
     return img
 
 
-def gen_gradient(r: int = None, g: int = None, b: int = None, x='+', y='+'):
+def gen_gradient(r: int = None, g: int = None, b: int = None, x = '+', y = '+'):
     """
     Using math coordinate. When either x or y or both is -, the the axis
     is flipped and the origin is recalculated accordingly
     """
     img = Image.new("RGBA", (16, 16))
-    r0, g0, b0 = r, g, b
-    
+
+    r0 = r
+    g0 = g
+    b0 = b
+
     x_pos = x == '+'
     y_pos = y == '+'
-    
+
     for x in range(16):
         for y in range(16):
             x_eff = x
             y_eff = 15 - y  # flip y-axis to match math coordinate
-            
+
             if r0 is not None:
                 g = x_eff if x_pos else 15 - x
                 b = y_eff if y_pos else 15 - y
@@ -129,13 +132,14 @@ def gen_gradient(r: int = None, g: int = None, b: int = None, x='+', y='+'):
             img.putpixel((x, y), ((r << 4) + r, (g << 4) + g, (b << 4) + b, 255))
     return img
 
-def gen_pride_flag(*colors:tuple):
-    height=len(colors)
-    width=round(height*16/9)
-    img=Image.new('RGBA',(width,height))
-    for y,color in enumerate(colors):
+
+def gen_pride_flag(*colors: tuple):
+    height = len(colors)
+    width = round(height * 16 / 9)
+    img = Image.new('RGBA', (width, height))
+    for y, color in enumerate(colors):
         for x in range(width):
-            img.putpixel((x,y),color)
+            img.putpixel((x, y), color)
     return img
 
 

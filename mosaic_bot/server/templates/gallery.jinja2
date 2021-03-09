@@ -1,0 +1,35 @@
+<!DOCType html>
+<html lang="en_US">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery</title>
+    <style>
+    table,th,tr,td{
+        border: 1px solid black;
+    }
+
+</style>
+<style type="text/css">
+    table { page-break-inside:auto }
+    tr    { page-break-inside:avoid; page-break-after:auto }
+    thead { display:table-header-group }
+    tfoot { display:table-footer-group }
+</style>
+
+</head>
+<body>
+
+<table style="table-layout: fixed;border-collapse: collapse;">
+    <tr>
+        <th> Name</th>
+        <th> Preview</th>
+    </tr>
+    {% for name,path in images %}
+        <tr>
+            <td style="text-align: center;font-family: Courier,monospace ">{{ name }}</td>
+            <td><img src="{{ encode(path) }}" style="min-width: 200px;max-width:400px; image-rendering: pixelated; margin: 2em"></td>
+        </tr>
+    {% endfor %}
+</table>
+</body>
+</html>

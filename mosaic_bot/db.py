@@ -181,6 +181,15 @@ def get_associated_messages(msg: int, is_request: bool):
     # because request message always comes first, its id is always smaller
     return list(map(lambda row: row[0], res.union(req).order_by(Response.response).all()))
 
+def list_images():
+    """
+    :return: an iterable of (name, path) of the image
+    """
+    s=Session()
+    res=[]
+    for name,hash in s.query(Image.name,Image.hash).order_by(Image.name).all():
+        res.append((name,compute_image_path_from_hash(hash)))
+    return res
 
 __all__ = [
     'NoResultFound',

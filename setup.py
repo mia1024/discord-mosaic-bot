@@ -12,7 +12,7 @@ setuptools.setup(
         python_requires='>=3.9',
         version=__version__,
         install_requires=[
-            'discord',
+            'discord.py',
             'aiohttp',
             'chardet',
             'cchardet',
