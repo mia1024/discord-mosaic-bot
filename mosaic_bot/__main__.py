@@ -1,4 +1,3 @@
-from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.bot import run_bot
 from mosaic_bot.server import run_server
 import argparse
