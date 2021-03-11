@@ -734,7 +734,7 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
         else:
             messages = (emojis,)
         for m in messages:
-            manager.queue(m)
+            manager.queue(m,use_webhook = True)
         await manager.commit_queue()
 
 
