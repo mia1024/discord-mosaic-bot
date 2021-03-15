@@ -8,6 +8,10 @@ for anyone on a remotely modern display to see it). This means that for
 [almost all](https://en.wikipedia.org/wiki/Almost_all) the new uploads, the 
 source image has to be scaled down to it's true pixel size. Cool. 
 
+By the way, if you are curious, I designed and implemented all the algorithms 
+in the following demonstrations as well as the cv module of the mosaic bot
+myself.
+
 ## Why is it hard?
 
 The auto scaling might seem to be the simplest part of the bot. After all, you 
@@ -259,6 +263,3 @@ image)
 
 ![](niko_labeled.png)
 ![](fireball_labeled.png)
-
-By the way, if you wonder where the algorithm described in this document came
-from: I made it.
