@@ -5,4 +5,4 @@ RUN pip install scipy discord aiohttp aiodns opencv-python pillow requests sqlal
 ENV MOSAIC_USE_DEV_TOKEN=1
 COPY . .
 RUN pip install -e .
-CMD python -m mosaic_bot bot
+CMD python -m mosaic_bot server

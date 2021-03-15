@@ -1,35 +1,186 @@
-<!DOCType html>
+<!DOCTYPE html>
 <html lang="en_US">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gallery</title>
+    <title>Gallery | Mosaic Bot</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/foundation-sites@6.6.3/dist/css/foundation.min.css"
+          integrity="sha256-ogmFxjqiTMnZhxCqVmcqTvjfe1Y/ec4WaRj/aQPvn+I=" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/foundation-sites@6.6.3/dist/js/foundation.min.js"
+            integrity="sha256-pRF3zifJRA9jXGv++b06qwtSqX1byFQOLjqa2PTEb2o=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-search@2.0.0/dist/umd/js-search.min.js"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/masonry-layout@4.2.2/dist/masonry.pkgd.min.js"></script>
     <style>
-    table,th,tr,td{
-        border: 1px solid black;
-    }
+        table, th, tr, td {
+            border: 1px solid black;
+        }
 
-</style>
-<style type="text/css">
-    table { page-break-inside:auto }
-    tr    { page-break-inside:avoid; page-break-after:auto }
-    thead { display:table-header-group }
-    tfoot { display:table-footer-group }
-</style>
+        table {
+            page-break-inside: auto
+        }
+
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto
+        }
+
+        thead {
+            display: table-header-group
+        }
+
+        tfoot {
+            display: table-footer-group
+        }
+
+        main {
+            width: 100vw;
+            padding: 1em;
+            background: #f5f5f5;
+        }
+
+        #main {
+            width: 100%;
+        }
+
+        #main img {
+            image-rendering: pixelated;
+            box-shadow: 1px 1px 10px 3px #ddd;
+        }
+
+        #grid-wrapper {
+            width: 100%;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            flex-flow: row wrap;
+        }
+
+        .img-wrapper {
+            padding: 5px;
+            width: 20%;
+        }
+
+        .img-wrapper img {
+            width: 100%;
+            max-height: 100%;
+        }
+
+        .img-wrapper img:hover {
+            cursor: pointer;
+        }
+
+        #search {
+            border: 1px solid black;
+            border-radius: 5px;
+        }
+
+        div#grid-anchor {
+            display: initial !important;
+            padding: 0;
+            margin: 0;
+            height: 0;
+        }
+
+        .reveal-overlay {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        #image-detail {
+            outline: none;
+            background: #eee;
+        }
+
+        #model-image {
+            image-rendering: pixelated;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        summary, details {
+            outline: none;
+        }
+
+        #image-properties {
+            height: calc(2em - 100%);
+            margin-top: 2em;
+        }
+
+        @font-face {
+            font-family: "Subway Ticker";
+            src: url("fonts/SubwayTicker.ttf") format("truetype")
+        }
+
+        @font-face {
+            font-family: "Oxygen Mono";
+            src: url("fonts/OxygenMono-Regular.ttf") format("truetype")
+        }
+
+        body {
+            font-family: "Oxygen Mono", "Courier New", "Courier", monospace;
+        }
+
+        h1, h2 {
+            font-family: 'Subway Ticker', 'Oxygen Mono', monospace;
+            text-align: center;
+            text-transform: uppercase
+        }
+
+        p {
+            line-height: 1.5;
+        }
+
+        .mosaic {
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            color: transparent;
+            background: linear-gradient(220deg, rgba(255, 0, 0, 0.8), rgba(255, 0, 0, 0) 70%),
+            linear-gradient(150deg, rgba(0, 255, 0, 0.8), rgba(0, 255, 0, 0) 70%),
+            linear-gradient(45deg, rgba(0, 0, 255, 0.8), rgba(0, 0, 255, 0) 70%);
+        }
+
+        .mosaic:hover {
+            color: transparent;
+        }
+    </style>
 
 </head>
 <body>
+<main class="grid-x">
+    <h1 class="cell small-12">The <a class="mosaic" href="/">Mosaic</a> Gallery</h1>
+    <div class="cell small-12 medium-10 medium-offset-1 grid-x">
+        <div class="cell small-12 medium-10 large-8 medium-offset-1 large-offset-2">
+            <input type="search" id="search" placeholder="perhaps you want to find something?">
+        </div>
 
-<table style="table-layout: fixed;border-collapse: collapse;">
-    <tr>
-        <th> Name</th>
-        <th> Preview</th>
-    </tr>
-    {% for name,path in images %}
-        <tr>
-            <td style="text-align: center;font-family: Courier,monospace ">{{ name }}</td>
-            <td><img src="{{ encode(path) }}" style="min-width: 200px;max-width:400px; image-rendering: pixelated; margin: 2em"></td>
-        </tr>
-    {% endfor %}
-</table>
+        <div id="main">
+            <div id="grid-wrapper" class="grid-x">
+            </div>
+        </div>
+
+        <div id="image-detail" class="large reveal" data-reveal>
+            <button class="close-button" data-close aria-label="Close modal" type="button">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <div class="grid-x">
+                <div class="cell small-12 medium-6" style="position: relative; height: 75vh">
+                    <img id="model-image">
+                </div>
+                <div class="cell auto"></div>
+                <div class="cell small-12 medium-5">
+                    <div id="image-properties">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="/js/gallery.js"></script>
 </body>
 </html>

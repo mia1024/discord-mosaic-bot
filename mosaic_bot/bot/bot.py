@@ -564,6 +564,12 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 f"Well, it seems like an image of `{opts.name}` is {img.width - 79} pixels too wide to be sent. "
                 r"Nice job on whoever managed to upload this I guess ¯\_(ツ)_/¯")
             return
+        elif img.width>76 and opts.with_space:
+            manager.logger.info(f'Image size check (with space) failed. Width is {img.width}, aborting')
+            await manager.send(
+                f"Well, it seems like an image of `{opts.name}` is {img.width - 76} pixels too wide to be sent, "
+                r"but you can probably get 3 more pixels of it if you don't request the space")
+            return
 
         emojis = gen_emoji_sequence(img, opts.large, opts.with_space)
         try:
