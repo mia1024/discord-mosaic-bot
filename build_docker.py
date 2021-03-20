@@ -9,8 +9,9 @@ if not in_docker:
         print('ERROR: working tree dirty. Please commit all changes first',file = sys.stderr)
         exit(1)
     hash=subprocess.run('git rev-parse HEAD',stdout = subprocess.PIPE,shell=True).stdout.decode()
-    args=f'docker build -t mia1024/mosaic-bot:latest -t mia1024/mosaic-bot:{hash[:6]} --build-arg MOSAIC_BUILD_HASH={hash} .'.split()
+    args=f'docker build -f Dockerfile -t mia1024/mosaic-bot:latest -t mia1024/mosaic-bot:{hash[:6]} --build-arg MOSAIC_BUILD_HASH={hash} .'.split()
     args.extend(sys.argv[1:])
+    os.environ['DOCKER_BUILDKIT']='1'
     os.execvp('docker',args)
 else:
     hash=os.environ.get('MOSAIC_BUILD_HASH')
