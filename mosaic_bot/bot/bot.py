@@ -61,8 +61,6 @@ logger.addHandler(stream)
 bot = commands.Bot('|', None, max_messages = None, intents = discord.Intents(messages = True))
 
 HELP_TEXT = f"""
-For detailed descriptions of available commands, please visit https://mosaic.by.jerie.wang/references.
-
 Available commands (parentheses denote required arguments, square brackets denote optional):
 ```
 |help
@@ -507,7 +505,7 @@ def log_command_enter(logger, ctx: commands.Context, command_name: str, args: st
 
 
 @bot.command()
-async def help(ctx: commands.Context, *, raw_args: str):
+async def help(ctx: commands.Context, *, raw_args: str=''):
     with MessageManager(ctx) as manager:
         log_command_enter(manager.logger, ctx, 'help', raw_args)
         await manager.send(HELP_TEXT)
