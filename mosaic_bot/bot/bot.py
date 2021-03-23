@@ -506,7 +506,7 @@ def log_command_enter(logger, ctx: commands.Context, command_name: str, args: st
 
 @bot.command()
 async def help(ctx: commands.Context, *, raw_args: str=''):
-    with MessageManager(ctx) as manager:
+    async with MessageManager(ctx) as manager:
         log_command_enter(manager.logger, ctx, 'help', raw_args)
         await manager.send(HELP_TEXT)
 
