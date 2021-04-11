@@ -38,7 +38,12 @@ def tester():
 
     if request.method == 'POST':
         if request.form.get('access-code') == 'your access code':
-            return 'Access granted <script>document.cookie = "alpha-tester=yes; expires=Thu, 1 Apr 2021 12:00:00 UTC; path=/";</script>'
+            return '<script>' \
+                   'document.cookie = "alpha-tester=yes; expires=Sat, 1 May 2021 12:00:00 UTC; path=/";' \
+                   'alert("access granted"); location.href="/";'\
+                   '</script>'
+            # if you took the trouble of looking at this code to figure out what the access code is
+            # then just add the cookie yourself. this is only designed to stop bots and random people online.
         else:
             return 'Nah', 401
 

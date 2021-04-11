@@ -20,8 +20,7 @@ RUN make -j$(nproc)
 RUN make install -j$(nproc)
 RUN rm -r /cv-dist/include/ /cv-dist/share/
 RUN rsync -rauv /cv-dist/ /mosaic_bot/env/
-# install some major dependencies that will definitely show up here so they can be cached
-RUN /mosaic_bot/env/bin/python -m pip install discord aiohttp cchardet requests pillow flask sqlalchemy
+RUN /mosaic_bot/env/bin/python -m pip install discord aiohttp cchardet requests pillow flask sqlalchemy  --compile
 
 RUN mkdir source
 WORKDIR /source
@@ -44,4 +43,5 @@ USER 1000:1000
 WORKDIR /bot
 ENV DATA_PATH=/bot/data
 ENV LD_LIBRARY_PATH=/bot/env/lib64
-CMD /bot/env/bin/python -m mosaic_bot bot
+ENV PATH=/bot/env/bin
+CMD /bot/env/bin/python -m mosaic_bot

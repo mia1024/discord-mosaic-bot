@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/foundation-sites@6.6.3/dist/css/foundation.min.css"
+          integrity="sha256-ogmFxjqiTMnZhxCqVmcqTvjfe1Y/ec4WaRj/aQPvn+I=" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/foundation-sites@6.6.3/dist/js/foundation.min.js"
+            integrity="sha256-pRF3zifJRA9jXGv++b06qwtSqX1byFQOLjqa2PTEb2o=" crossorigin="anonymous"></script>
+    <title>Upload Image | Mosaic Bot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @font-face {
+            font-family: "Subway Ticker";
+            src: url("fonts/SubwayTicker.ttf") format("truetype")
+        }
+
+        @font-face {
+            font-family: "Oxygen Mono";
+            src: url("fonts/OxygenMono-Regular.ttf") format("truetype")
+        }
+
+        body {
+            font-family: "Oxygen Mono", "Courier New", "Courier", monospace;
+            background: #f5f5f5;
+        }
+
+        main {
+            width: 100vw;
+            padding: 1em;
+        }
+
+        h1, h2 {
+            font-family: 'Subway Ticker', 'Oxygen Mono', monospace;
+            text-align: center;
+            text-transform: uppercase
+        }
+
+        p {
+            line-height: 1.5;
+        }
+
+        .mosaic {
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            color: transparent;
+            background: linear-gradient(220deg, rgba(255, 0, 0, 0.8), rgba(255, 0, 0, 0) 70%),
+            linear-gradient(150deg, rgba(0, 255, 0, 0.8), rgba(0, 255, 0, 0) 70%),
+            linear-gradient(45deg, rgba(0, 0, 255, 0.8), rgba(0, 0, 255, 0) 70%);
+        }
+
+        .mosaic:hover {
+            color: transparent;
+        }
+
+        #image-preview img {
+            max-width: 100%;
+            max-height: calc(60vh - 3em);
+            image-rendering: pixelated;
+            object-fit: contain;
+            display: block;
+            margin: auto;
+        }
+
+        #image-preview .wrapper {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: fit-content;
+        }
+
+        #image-preview {
+            max-height: 60vh;
+            min-height: 30vh;
+            margin-top: 1.5em;
+            width: 100%;
+            position: relative
+        }
+
+        .button {
+            display: block;
+            width: fit-content;
+            width: -moz-fit-content;
+        }
+
+        label[for="upload"] {
+            margin-top: 1em;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+
+        #image-upload-confirms {
+            margin-top: 1em;
+            display: flex;
+            justify-content: space-evenly;
+        }
+    </style>
+</head>
+<body>
+<main class="grid-x">
+    <h1 class="cell small-12">Upload a new <a class="mosaic" href="/">mosaic</a> image</h1>
+    {% if not username %}
+        <p class="cell small-10 small-offset-1 medium-8 medium-offset-2 large-6 large-offset-3">
+            You need to login through Discord first. Don't worry, your information is stored completely locally and
+            only lasts until you restart your browser.
+
+        </p>
+        <div class="cell small-10 small-offset-1 medium-8 medium-offset-2 large-6 large-offset-3"
+             style="text-align: center">
+            <a class="button" href="/login">Login Here</a>
+        </div>
+    {% else %}
+        <div id="intro-screen" class="grid-x">
+            <p class="cell small-12 medium-8 medium-offset-2">
+                You can upload a new image here. However, please be sure that you don't upload any image that is
+                offensive
+                or otherwise inappropriate. Any violation will result in your account ({{ username }}) being <strong>permanently
+                banned</strong>
+                from interacting with the mosaic bot ever again.
+            </p>
+            <p class="cell small-12 medium-8 medium-offset-2">
+                What? You aren't {{ username }}? Well, you can login to your own account <a href="/login">here</a>.
+            </p>
+            <div style="display: flex;justify-content: space-evenly" class="cell small-12">
+                <button class="button success" onclick="$('#intro-screen').css('display','none');
+                $('#image-select').css('display','')">Sure, let's do this
+                </button>
+                <button class="button warning" onclick="$.ajax('/logout').then(location.href='/')">Actually, never
+                    mind
+                </button>
+            </div>
+        </div>
+        <div id="image-select" style="display: none;position: relative" class="cell small-12 medium-8 medium-offset-2">
+            Let's upload the image here. It needs to be either a PNG or JPEG file with fewer than 4 megapixels.
+            Additionally, the image you uploaded must be a pixel art with an effective width of 79px or less.
+            <label for="upload" class="button">Select Image</label>
+            <input type="file" id="upload"
+                   accept="image/png,image/jpeg,image/webp,image/tiff,image/bmp,image/gif,.png,.jpg,.jpeg,.webp,.gif,.tiff,.bmp"
+                   class="show-for-sr">
+            <div id="image-preview" class="grid-x">
+
+            </div>
+            <div id="image-upload-confirms" style="display: none">
+                <button class="button success" onclick="findScale()">Looking good! Proceed!</button>
+                <button class="button warning" onclick="resetUpload()">Actually, let's try this again</button>
+            </div>
+        </div>
+        <script src="/js/upload.js"></script>
+    {% endif %}
+</main>
+</body>
+</html>

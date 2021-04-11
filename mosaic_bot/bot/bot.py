@@ -505,9 +505,9 @@ def log_command_enter(logger, ctx: commands.Context, command_name: str, args: st
 
 
 @bot.command()
-async def help(ctx: commands.Context, *, raw_args: str=''):
+async def help(ctx: commands.Context, *args):
     async with MessageManager(ctx) as manager:
-        log_command_enter(manager.logger, ctx, 'help', raw_args)
+        log_command_enter(manager.logger, ctx, 'help', ' '.join(args))
         await manager.send(HELP_TEXT)
 
 
@@ -710,6 +710,7 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
         log_command_enter(manager.logger, ctx, 'pride', raw_args)
         opts = parse_opt(raw_args)
         if not opts.name:
+            manager.logger.info('No pride flag name supplied. Using random')
             opts.name = random.choice('ace trans gay bi pan nb aro les'.split())
         if opts.name in ('ace', 'asexual'):
             img = gen_pride_flag((0, 0, 0), (163, 163, 163), (255, 255, 255), (128, 0, 128))
@@ -728,9 +729,11 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
         elif opts.name in ('lesbian', 'les'):
             img = gen_pride_flag((214, 41, 0), (255, 155, 85), (255, 255, 255), (212, 97, 166), (165, 0, 98))
         else:
+            manager.logger.info('Cannot match pride flag name. Aborting')
             await manager.send(
                 f"Unfortunately I've never seen a pride flag named `{opts.name}`. I'd be happy to learn it though")
             return
+        manager.logger.info('Pride flag name matched. Proceeding')
 
         emojis = gen_emoji_sequence(img, opts.large, opts.with_space)
         if opts.large or opts.multiline:

@@ -77,8 +77,8 @@ or
 <pre><code>|show ${img.id}</code></pre>
 </p>
 <p>
-Available options: <code>multiline</code> or <code>irc</code>${img.width > 27 ? "" : ", <code>large</code>"}${
-        img.width > 76 ?"" : ", <pre><code>with space</code></pre>"}
+Available options: ${
+        img.width > 76 ?"" : "<code>with space</code>, "}<code>multiline</code>/<code>irc</code>${img.width > 27 ? "" : ", <code>large</code>"}
 </p>
 
 `)

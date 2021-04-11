@@ -1,13 +1,18 @@
 from mosaic_bot.bot import run_bot
 from mosaic_bot.server import run_server
-import argparse
+from mosaic_bot import DATA_PATH
+import argparse, os
 
-parser=argparse.ArgumentParser(description='Run part of the file', prog='mosaic_bot')
-parser.add_argument('component',choices=['bot','server'])
-args=parser.parse_args()
+parser = argparse.ArgumentParser(description = 'Run part of the file', prog = 'mosaic_bot')
+parser.add_argument('component', choices = ['bot', 'server', 'gunicorn'])
+args = parser.parse_args()
 
-if args.component=='bot':
+if args.component == 'bot':
     run_bot()
-else:
+elif args.component == 'server':
     run_server()
-
+else:
+    os.execvp('gunicorn', ['gunicorn','mosaic_bot.server.wsgi',
+                           '--access-logfile', '-',
+                           '--workers', '1',
+                           '--bind', 'unix:'+str(DATA_PATH/'gunicorn.sock')])
