@@ -21,7 +21,9 @@ def check_cookies():
 
 @app.route('/')
 def landing():
-    return 'Page under construction. Please come back later. Perhaps check <a href="/gallery">gallery</a> and <a href="/upload">upload</a>?'
+    if c := check_cookies():
+        return c
+    return redirect('/gallery')
 
 
 @app.route('/alpha-tester', methods = ['GET', 'POST'])
