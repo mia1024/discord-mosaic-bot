@@ -101,14 +101,22 @@ User.metadata.create_all(engine)
 Response.metadata.create_all(engine)
 
 
-def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 6, time_uploaded=None) -> None:
+def check_hash_conflict(hash: int, min_allowed_diff = 6, s: Session = None):
+    if s is None:
+        s = Session()
+    all_images = s.query(Image.hash, Image.name).all()
+    for im in all_images:
+        if diff_hash(im.hash, hash) < min_allowed_diff:
+            return im
+    return None
+
+
+def add_image(img: PIL.Image.Image, name: str, min_allowed_diff: int = 6, time_uploaded = None) -> None:
     s = Session()
     hash = hash_image(img)
-    all_images = s.query(Image).all()
-    for im in all_images:
-        if (d := diff_hash(im.hash, hash)) < min_allowed_diff:
-            raise ImageExists(f'Hash of {name} is in conflict with {im.name}: {im.hash}. Diff is {d}.')
-    s.add(Image(name = name, hash = hash, width = img.width, height = img.height, time_uploaded=time_uploaded))
+    if conflict := check_hash_conflict(hash, min_allowed_diff, s):
+        raise ImageExists(f'Hash of {name} is in conflict with {conflict.name}: {conflict.hash}.')
+    s.add(Image(name = name, hash = hash, width = img.width, height = img.height, time_uploaded = time_uploaded))
     s.commit()
 
 
@@ -190,8 +198,9 @@ def list_images():
     """
     s = Session()
     res = []
-    for name, hash, width, height, time in s.query(Image.name, Image.hash, Image.width, Image.height, Image.time_uploaded).order_by(
-            Image.time_uploaded.desc()).all():
+    for name, hash, width, height, time in s.query(Image.name, Image.hash, Image.width, Image.height,
+                                                   Image.time_uploaded).order_by(
+        Image.time_uploaded.desc()).all():
         res.append((name, hash, width, height, time.timestamp()))
     return res
 

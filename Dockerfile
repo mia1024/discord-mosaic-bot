@@ -5,7 +5,7 @@ RUN apk update && apk add --no-cache build-base cmake libffi-dev openjpeg-dev li
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
-ENV CFLAGS="-g0 -s -O3 -fomit-frame-pointer -flto -march=native"
+ENV CFLAGS="-g0 -s -O3 -fomit-frame-pointer -flto"
 
 RUN mkdir /mosaic_bot
 RUN python -m venv /mosaic_bot/env
