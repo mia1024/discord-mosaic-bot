@@ -44,4 +44,4 @@ WORKDIR /bot
 ENV DATA_PATH=/bot/data
 ENV LD_LIBRARY_PATH=/bot/env/lib64
 ENV PATH=/bot/env/bin
-CMD /bot/env/bin/python -m mosaic_bot
+ENTRYPOINT /bot/env/bin/python -m mosaic_bot
