@@ -15,4 +15,4 @@ else:
     os.execvp('gunicorn', ['gunicorn','mosaic_bot.server.wsgi',
                            '--access-logfile', '-',
                            '--workers', '1',
-                           '--bind', 'unix:'+str(DATA_PATH/'gunicorn.sock')])
+                           '--bind', '0.0.0.0:80'])
