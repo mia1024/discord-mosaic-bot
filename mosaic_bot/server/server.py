@@ -1,16 +1,16 @@
-from flask import Flask, request, redirect, render_template, jsonify, send_from_directory, session, abort
-from mosaic_bot import db, image
-import mosaic_bot.hash
-from PIL import Image
-from functools import lru_cache
 import os
 import secrets
-from mosaic_bot.credentials import SERVER_SECRET_KEY, MOSAIC_CLIENT_ID, MOSAIC_CLIENT_SECRET, OAUTH_REDIRECT_URI
-from urllib.parse import quote
+
 import requests
+from flask import abort, Flask, jsonify, redirect, render_template, request, session
+from PIL import Image
+
+import mosaic_bot.hash
+from mosaic_bot import db, image, DATA_PATH
+from mosaic_bot.credentials import MOSAIC_CLIENT_ID, MOSAIC_CLIENT_SECRET, OAUTH_REDIRECT_URI, SERVER_SECRET_KEY
 
 JSONIFY_PRETTYPRINT_REGULAR = False
-app = Flask('mosaic_server', template_folder = os.path.abspath(os.path.dirname(__file__)) + '/templates')
+app = Flask('mosaic_server', template_folder = DATA_PATH/'templates')
 app.secret_key = SERVER_SECRET_KEY
 
 

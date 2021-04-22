@@ -17,8 +17,8 @@ if not in_docker:
         hash = subprocess.run('git rev-parse HEAD', stdout = subprocess.PIPE, shell = True).stdout.decode()
 
     root = pathlib.Path(__file__).resolve().parent
-    shutil.rmtree(root / 'data' / 'static',ignore_errors = True)
-    shutil.copytree(root / 'mosaic_bot/server/static', root / 'data/static')
+    # shutil.rmtree(root / 'data' / 'static',ignore_errors = True)
+    # shutil.copytree(root / 'mosaic_bot/server/static', root / 'data/static')
     args = f'docker build -f Dockerfile -t mia1024/mosaic-bot:latest -t mia1024/mosaic-bot:{hash[:6]} --build-arg MOSAIC_BUILD_HASH={hash} .'.split()
     args.extend(sys.argv[1:])
 
