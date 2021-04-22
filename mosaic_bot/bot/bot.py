@@ -84,7 +84,9 @@ Examples:
 |pride ace
 |delete 811485105436360744
 ```
-Note that if you reply to a specific message, you don't have to provide an ID or link.
+Note that if you reply to a specific message, you don't have to provide an ID or link. 
+
+For a complete list of images, please refer to <https://bemosaic.art/gallery>
 """
 
 VERSION_TEXT = f'Mosaic bot v{__version__}, {__build_type__} build `{__build_hash__[:8]}` at {__build_time__}'
