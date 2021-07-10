@@ -2,7 +2,7 @@ import os
 import secrets
 
 import requests
-from flask import abort, Flask, jsonify, redirect, render_template, request, session
+from flask import abort, Flask, jsonify, redirect, render_template, request, session, send_from_directory
 from PIL import Image
 
 import mosaic_bot.hash
@@ -135,6 +135,12 @@ def api_gallery():
             'id'    : str(h)  # js number precision is...problematic for 144 bit integers
         })
     return jsonify(res)
+
+@app.route('/static/<filename>')
+def static_files(filename):
+    if not app.debug:
+        return "Not Found", 404
+    return send_from_directory(DATA_PATH/'static',filename)
 
 
 if __name__ == '__main__':

@@ -51,10 +51,15 @@ $('#search').on('input', function (e) {
 
         } else {
             let selected = search.search(v).map(o => o.id);
+            let toggleCount = 0;
             $('.img-wrapper').each((i, e) => {
-                e.style.display = selected.includes(e.id) ? '' : 'none'
+                e.style.display= selected.includes(e.id) ? '' : 'none'
             })
-            $('#grid-wrapper').masonry('layout')
+            $('#grid-wrapper').masonry('destroy').masonry({
+                itemSelector: '.img-wrapper',
+                columnWidth: '#grid-anchor'
+            });
+
         }
     }, 300) // only perform a search after the user isn't typing for 300 ms
 })
@@ -78,7 +83,7 @@ or
 </p>
 <p>
 Available options: ${
-        img.width > 76 ?"" : "<code>with space</code>, "}<code>multiline</code>/<code>irc</code>${img.width > 27 ? "" : ", <code>large</code>"}
+        img.width > 76 ? "" : "<code>with space</code>, "}<code>multiline</code>/<code>irc</code>${img.width > 27 ? "" : ", <code>large</code>"}
 </p>
 
 `)
