@@ -7,8 +7,8 @@ from mosaic_bot import __version__
 setuptools.setup(
     name = 'discord-mosaic-bot',
     author = 'Mia Celeste',
-    url = 'https://mosaic.by.jerie.wang/',
-    author_email = 'mail@jerie.wang',
+    url = 'https://bemosiac.art/',
+    author_email = 'mia@miaceleste.dev',
     python_requires = '>=3.9',
     version = __version__,
     install_requires = [

@@ -224,8 +224,8 @@ class MessageManager:
                 self.logger.debug(f'Message ids {self.message_ids} added to database')
             return True
         elif exc_type == WebhookCreationError:
-            await self.send("Sorry, I can't do it here because I can't create a Webhook. "+(
-                "Please grant me `MANAGE_WEBHOOKS` first" if self.channel_type==0 else "Ya know, sometimes things just don't work in DM"
+            await self.send("Sorry, I can't do it here because I can't create a webhook. "+(
+                "Please grant me `MANAGE_WEBHOOKS` permission first" if self.channel_type==0 else "Ya know, sometimes things just don't work in DM"
             ))
             self.logger.debug('Unable to create a webhook. Requester notified')
             return True

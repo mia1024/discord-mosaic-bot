@@ -41,7 +41,7 @@ def tester():
     if request.method == 'POST':
         if request.form.get('access-code') == 'your access code':
             return '<script>' \
-                   'document.cookie = "alpha-tester=yes; expires=Sat, 1 May 2021 12:00:00 UTC; path=/";' \
+                   'document.cookie = "alpha-tester=yes; expires=Mon, 1 Nov 2021 12:00:00 UTC; path=/";' \
                    'alert("access granted"); location.href="/";'\
                    '</script>'
             # if you took the trouble of looking at this code to figure out what the access code is

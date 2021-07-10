@@ -19,7 +19,7 @@ if not in_docker:
     root = pathlib.Path(__file__).resolve().parent
     # shutil.rmtree(root / 'data' / 'static',ignore_errors = True)
     # shutil.copytree(root / 'mosaic_bot/server/static', root / 'data/static')
-    args = f'docker build -f Dockerfile -t mia1024/mosaic-bot:latest -t mia1024/mosaic-bot:{hash[:6]} --build-arg MOSAIC_BUILD_HASH={hash} .'.split()
+    args = f'docker build -f Dockerfile -t mia1024/discord-mosaic-bot:latest -t mia1024/discord-mosaic-bot:{hash[:6]} --build-arg MOSAIC_BUILD_HASH={hash} .'.split()
     args.extend(sys.argv[1:])
 
     os.environ['DOCKER_BUILDKIT'] = '1'
