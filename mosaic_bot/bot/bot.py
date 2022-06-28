@@ -20,6 +20,8 @@ from mosaic_bot.credentials import MOSAIC_BOT_TOKEN
 from mosaic_bot.emojis import get_emoji_by_rgb
 from mosaic_bot.image import gen_emoji_sequence, gen_gradient, gen_pride_flag
 
+DISCORD_API_ENDPOINT = "https://discord.com/api/v8"
+
 # ---------------- logging ----------------
 
 try:
@@ -159,7 +161,7 @@ class MessageManager:
         # ctx doesn't contain the channel type
         self.logger.info('Retrieving channel type from discord API')
         async with aiohttp.ClientSession() as session:
-            resp = await session.get(f'https://discord.com/api/v8/channels/{self.channel}'
+            resp = await session.get(DISCORD_API_ENDPOINT + f'/channels/{self.channel}'
                                      , headers = {'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN})
             json = await resp.json()
             self.channel_type = json['type']
@@ -224,8 +226,8 @@ class MessageManager:
                 self.logger.debug(f'Message ids {self.message_ids} added to database')
             return True
         elif exc_type == WebhookCreationError:
-            await self.send("Sorry, I can't do it here because I can't create a webhook. "+(
-                "Please grant me `MANAGE_WEBHOOKS` permission first" if self.channel_type==0 else "Ya know, sometimes things just don't work in DM"
+            await self.send("Sorry, I can't do it here because I can't create a webhook. " + (
+                "Please grant me `MANAGE_WEBHOOKS` permission first" if self.channel_type == 0 else "Ya know, sometimes things just don't work in DM"
             ))
             self.logger.debug('Unable to create a webhook. Requester notified')
             return True
@@ -413,7 +415,7 @@ async def delete_messages(cid: int, msgs: List[int], bulk = True):
     async with aiohttp.ClientSession() as session:
         if len(msgs) == 1:
             res = await session.delete(
-                f'https://discord.com/api/v8/channels/{cid}/messages/{msgs[0]}',
+                DISCORD_API_ENDPOINT + f'/channels/{cid}/messages/{msgs[0]}',
                 headers = {
                     'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                 },
@@ -421,7 +423,7 @@ async def delete_messages(cid: int, msgs: List[int], bulk = True):
             logger.info(f'Completed. Return code is {res.status}')
         elif bulk:
             res = await session.post(
-                f'https://discord.com/api/v8/channels/{cid}/messages/bulk-delete',
+                DISCORD_API_ENDPOINT + f'/channels/{cid}/messages/bulk-delete',
                 headers = {
                     'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                 },
@@ -449,7 +451,7 @@ async def delete_messages(cid: int, msgs: List[int], bulk = True):
             for mid in msgs:
                 logger.info(f'Deleting {mid}')
                 res = await session.delete(
-                    f'https://discord.com/api/v8/channels/{cid}/messages/{mid}',
+                    DISCORD_API_ENDPOINT + f'/channels/{cid}/messages/{mid}',
                     headers = {
                         'Authorization': 'Bot ' + MOSAIC_BOT_TOKEN,
                     },
@@ -564,7 +566,7 @@ async def show(ctx: commands.Context, *, raw_or_parsed_args: Union[str, ShowOpti
                 f"Well, it seems like an image of `{opts.name}` is {img.width - 79} pixels too wide to be sent. "
                 r"Nice job on whoever managed to upload this I guess ¯\_(ツ)_/¯")
             return
-        elif img.width>76 and opts.with_space:
+        elif img.width > 76 and opts.with_space:
             manager.logger.info(f'Image size check (with space) failed. Width is {img.width}, aborting')
             await manager.send(
                 f"Well, it seems like an image of `{opts.name}` is {img.width - 76} pixels too wide to be sent, "
@@ -743,7 +745,7 @@ async def pride(ctx: commands.Context, *, raw_args = ''):
         else:
             messages = (emojis,)
         for m in messages:
-            manager.queue(m,use_webhook = True)
+            manager.queue(m, use_webhook = True)
         await manager.commit_queue()
 
 

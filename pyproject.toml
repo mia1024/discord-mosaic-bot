@@ -1,0 +1,31 @@
+[project]
+name = "discord-mosaic-bot"
+authors = [
+    { name = "Mia Celeste", email = "mia@miaceleste.dev" }
+]
+readme = "README.md"
+dependencies = [
+    "discord.py>=1.7",
+    "aiohttp[speedups]>=3.7",
+    "requests>=2.28",
+    "numpy>=1.23",
+    "pillow>=8.0",
+    "SQLAlchemy>=1.4",
+    "flask[async]>=2.1"
+]
+requires-python = ">=3.10"
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://bemosaic.art/"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "mosaic_bot.__version__" }
+
+[tool.setuptools]
+packages = ["mosaic_bot", "mosaic_bot.bot", "mosaic_bot.server"]
+zip-safe = false

@@ -13,7 +13,7 @@ if p:=os.environ.get('DATA_PATH'):
 else:
     DATA_PATH=pathlib.Path(__file__).resolve().parent.parent/'data'
 IMAGE_DIR = DATA_PATH / 'images'
-__version__ = '0.16'
+__version__ = '1.6'
 # versions will be numbered after the golden ratio, like how LaTeX does it
 
 from .__build__ import (build_hash as __build_hash__,
