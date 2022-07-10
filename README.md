@@ -17,3 +17,9 @@ larger version, perhaps.
 # Install 
 
 `pip install -e .`
+
+# Screenshots
+
+![cat](screenshots/cat.png)
+![ghost](screenshots/ghost.png)
+![kirby](screenshots/kirby.png)
